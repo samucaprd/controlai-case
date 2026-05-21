@@ -135,4 +135,3 @@ Esta plataforma permitirá que **empresas (Tenants)** se inscrevam, gerenciem se
 - LGPD (Lei Geral de Proteção de Dados).
 - PCI DSS (via Stripe).
 - SOC 2 Type II (via Supabase e Netlify).
-- Alteração Manual
