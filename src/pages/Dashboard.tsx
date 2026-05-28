@@ -1,6 +1,8 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Users, MessageSquare, TrendingUp, Activity } from "lucide-react";
+import { Navigate } from "react-router-dom";
+import { useAuth, getDashboardPathForRole } from "@/features/auth/auth-context";
 
 const stats = [
   {
@@ -34,6 +36,12 @@ const stats = [
 ];
 
 export default function Dashboard() {
+  const { role } = useAuth();
+
+  if (role) {
+    return <Navigate to={getDashboardPathForRole(role)} replace />;
+  }
+
   return (
     <div className="space-y-8">
       <div>

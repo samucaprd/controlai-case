@@ -12,32 +12,44 @@ import Colaborador from "./pages/dashboard/Colaborador";
 import Admin from "./pages/dashboard/Admin";
 import Master from "./pages/dashboard/Master";
 import NotFound from "./pages/NotFound";
+import { AuthProvider } from "@/features/auth/auth-context";
+import { RequireAuth } from "@/features/auth/require-auth";
+import { RequireRole } from "@/features/auth/require-role";
 
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Landing />} />
-          <Route path="/auth/login" element={<Login />} />
-          <Route path="/auth/register" element={<Register />} />
-          
-          <Route path="/dashboard" element={<DashboardLayout />}>
-            <Route index element={<Dashboard />} />
-            <Route path="colaborador" element={<Colaborador />} />
-            <Route path="admin" element={<Admin />} />
-            <Route path="master" element={<Master />} />
-          </Route>
-          
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
+    <AuthProvider>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<Landing />} />
+            <Route path="/auth/login" element={<Login />} />
+            <Route path="/auth/register" element={<Register />} />
+
+            <Route element={<RequireAuth />}>
+              <Route path="/dashboard" element={<DashboardLayout />}>
+                <Route index element={<Dashboard />} />
+                <Route element={<RequireRole allowed={["user"]} />}>
+                  <Route path="colaborador" element={<Colaborador />} />
+                </Route>
+                <Route element={<RequireRole allowed={["admin"]} />}>
+                  <Route path="admin" element={<Admin />} />
+                </Route>
+                <Route element={<RequireRole allowed={["master"]} />}>
+                  <Route path="master" element={<Master />} />
+                </Route>
+              </Route>
+            </Route>
+
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+      </TooltipProvider>
+    </AuthProvider>
   </QueryClientProvider>
 );
 
