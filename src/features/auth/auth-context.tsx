@@ -18,6 +18,7 @@ interface AuthState {
   empresa: EmpresaPublic | null;
   role: AppRole | null;
   isLoading: boolean;
+  profileError: string | null;
   refreshProfile: () => Promise<void>;
   signOut: () => Promise<void>;
 }
@@ -54,19 +55,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [perfil, setPerfil] = useState<Perfil | null>(null);
   const [empresa, setEmpresa] = useState<EmpresaPublic | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [profileError, setProfileError] = useState<string | null>(null);
+
+  const loadProfile = useCallback(async (userId: string) => {
+    try {
+      const { perfil: p, empresa: e } = await fetchProfile(userId);
+      setPerfil(p);
+      setEmpresa(e);
+      setProfileError(null);
+    } catch (err) {
+      setPerfil(null);
+      setEmpresa(null);
+      setProfileError(
+        err instanceof Error ? err.message : "Erro ao carregar perfil.",
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   const refreshProfile = useCallback(async () => {
+    setIsLoading(true);
     const currentUser = (await supabase.auth.getUser()).data.user;
     if (!currentUser) {
       setPerfil(null);
       setEmpresa(null);
+      setProfileError(null);
+      setIsLoading(false);
       return;
     }
 
-    const { perfil: p, empresa: e } = await fetchProfile(currentUser.id);
-    setPerfil(p);
-    setEmpresa(e);
-  }, []);
+    await loadProfile(currentUser.id);
+  }, [loadProfile]);
 
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
@@ -74,6 +94,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setPerfil(null);
     setEmpresa(null);
+    setProfileError(null);
   }, []);
 
   useEffect(() => {
@@ -87,49 +108,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(data.session?.user ?? null);
 
       if (data.session?.user) {
-        try {
-          const { perfil: p, empresa: e } = await fetchProfile(data.session.user.id);
-          setPerfil(p);
-          setEmpresa(e);
-        } catch {
-          setPerfil(null);
-          setEmpresa(null);
-        }
+        await loadProfile(data.session.user.id);
+      } else {
+        setIsLoading(false);
       }
-
-      setIsLoading(false);
     };
 
     void init();
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, nextSession) => {
+    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       setSession(nextSession);
       setUser(nextSession?.user ?? null);
 
-      if (nextSession?.user) {
-        try {
-          const { perfil: p, empresa: e } = await fetchProfile(nextSession.user.id);
-          setPerfil(p);
-          setEmpresa(e);
-        } catch {
-          setPerfil(null);
-          setEmpresa(null);
-        }
-      } else {
+      if (!nextSession?.user) {
         setPerfil(null);
         setEmpresa(null);
+        setProfileError(null);
+        setIsLoading(false);
+        return;
       }
 
-      setIsLoading(false);
+      setIsLoading(true);
+      setProfileError(null);
+
+      // Defer evita deadlock com signInWithPassword (Supabase Auth lock)
+      setTimeout(() => {
+        if (!mounted) return;
+        void loadProfile(nextSession.user.id);
+      }, 0);
     });
 
     return () => {
       mounted = false;
       subscription.unsubscribe();
     };
-  }, []);
+  }, [loadProfile]);
 
   const value = useMemo<AuthState>(
     () => ({
@@ -139,10 +154,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       empresa,
       role: perfil?.role ?? null,
       isLoading,
+      profileError,
       refreshProfile,
       signOut,
     }),
-    [session, user, perfil, empresa, isLoading, refreshProfile, signOut],
+    [
+      session,
+      user,
+      perfil,
+      empresa,
+      isLoading,
+      profileError,
+      refreshProfile,
+      signOut,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
