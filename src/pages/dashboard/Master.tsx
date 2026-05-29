@@ -1,289 +1,261 @@
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Building2, Users, TrendingUp, DollarSign, Activity } from "lucide-react";
 import {
-  BarChart,
-  Bar,
-  PieChart,
-  Pie,
-  Cell,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer
-} from "recharts";
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Building2, Users, Activity } from "lucide-react";
+import { supabase } from "@/lib/supabase/client";
+import { RoleGate } from "@/features/auth/role-gate";
+import type { EmpresaPublic, Perfil } from "@/lib/supabase/database.types";
 
-const subscriptionData = [
-  { name: "Básico", value: 145, color: "hsl(166, 100%, 50%)" },
-  { name: "Empresa", value: 89, color: "hsl(42, 100%, 48%)" },
-  { name: "Master", value: 23, color: "hsl(0, 0%, 69%)" }
-];
+interface PlanoRow {
+  id: number;
+  nome: string;
+  preco_mensal: number;
+}
 
-const monthlyData = [
-  { month: "Jan", empresas: 45, usuarios: 890 },
-  { month: "Fev", empresas: 52, usuarios: 1050 },
-  { month: "Mar", empresas: 61, usuarios: 1280 },
-  { month: "Abr", empresas: 73, usuarios: 1520 },
-  { month: "Mai", empresas: 89, usuarios: 1890 },
-  { month: "Jun", empresas: 108, usuarios: 2345 }
-];
+interface AuditoriaRow {
+  id: number;
+  acao: string;
+  entidade_tipo: string;
+  empresa_id: number | null;
+  created_at: string;
+  detalhes: Record<string, unknown>;
+}
 
-const platformStats = [
-  {
-    title: "Total de Empresas",
-    value: "257",
-    change: "+23 este mês",
-    icon: Building2,
-    color: "text-primary"
-  },
-  {
-    title: "Usuários Ativos",
-    value: "2,345",
-    change: "+12.5%",
-    icon: Users,
-    color: "text-secondary"
-  },
-  {
-    title: "Receita Mensal",
-    value: "R$ 48.5K",
-    change: "+18.2%",
-    icon: DollarSign,
-    color: "text-primary"
-  },
-  {
-    title: "Taxa de Retenção",
-    value: "94.3%",
-    change: "+2.1%",
-    icon: TrendingUp,
-    color: "text-secondary"
+async function fetchMasterData() {
+  const [empresasRes, planosRes, perfisRes, auditoriaRes] = await Promise.all([
+    supabase.from("empresas_public").select("*").order("created_at", { ascending: false }),
+    supabase.from("planos").select("id, nome, preco_mensal"),
+    supabase.from("perfis").select("id, empresa_id, role, email"),
+    supabase
+      .from("auditoria")
+      .select("id, acao, entidade_tipo, empresa_id, created_at, detalhes")
+      .order("created_at", { ascending: false })
+      .limit(25),
+  ]);
+
+  if (empresasRes.error) throw empresasRes.error;
+  if (planosRes.error) throw planosRes.error;
+  if (perfisRes.error) throw perfisRes.error;
+  if (auditoriaRes.error) throw auditoriaRes.error;
+
+  return {
+    empresas: (empresasRes.data ?? []) as EmpresaPublic[],
+    planos: (planosRes.data ?? []) as PlanoRow[],
+    perfis: (perfisRes.data ?? []) as Pick<Perfil, "id" | "empresa_id" | "role" | "email">[],
+    auditoria: (auditoriaRes.data ?? []) as AuditoriaRow[],
+  };
+}
+
+function MasterContent() {
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["master-dashboard"],
+    queryFn: fetchMasterData,
+  });
+
+  const planosMap = new Map(data?.planos.map((p) => [p.id, p]) ?? []);
+  const usuariosPorEmpresa = (data?.perfis ?? []).reduce<Record<number, number>>(
+    (acc, p) => {
+      if (p.role === "master") return acc;
+      acc[p.empresa_id] = (acc[p.empresa_id] ?? 0) + 1;
+      return acc;
+    },
+    {},
+  );
+
+  const planoCounts = (data?.empresas ?? []).reduce<Record<string, number>>(
+    (acc, e) => {
+      const nome = planosMap.get(e.plano_id ?? 0)?.nome ?? "Desconhecido";
+      acc[nome] = (acc[nome] ?? 0) + 1;
+      return acc;
+    },
+    {},
+  );
+
+  const totalEmpresas = data?.empresas.length ?? 0;
+  const totalUsuarios =
+    data?.perfis.filter((p) => p.role !== "master").length ?? 0;
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center">
+        <p className="text-muted-foreground">Carregando dados da plataforma...</p>
+      </div>
+    );
   }
-];
 
-export default function Master() {
+  if (error) {
+    return (
+      <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-destructive">
+        Erro ao carregar dashboard master. Verifique se seu usuário tem role{" "}
+        <strong>master</strong>.
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8">
       <div>
         <h1 className="text-3xl font-bold">Dashboard Master</h1>
         <p className="text-muted-foreground mt-2">
-          Visão geral da plataforma completa
+          Visão cross-tenant da plataforma (dados reais via RLS)
         </p>
       </div>
 
-      {/* Platform Stats */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        {platformStats.map((stat, index) => (
-          <Card key={index} className="border-border">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                {stat.title}
-              </CardTitle>
-              <stat.icon className={`h-5 w-5 ${stat.color}`} />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stat.value}</div>
-              <p className="text-xs text-muted-foreground mt-2">
-                {stat.change}
-              </p>
-            </CardContent>
-          </Card>
-        ))}
+      <div className="grid gap-6 md:grid-cols-3">
+        <Card className="border-border">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total de Empresas</CardTitle>
+            <Building2 className="h-5 w-5 text-primary" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalEmpresas}</div>
+          </CardContent>
+        </Card>
+        <Card className="border-border">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Usuários na Plataforma</CardTitle>
+            <Users className="h-5 w-5 text-secondary" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalUsuarios}</div>
+          </CardContent>
+        </Card>
+        <Card className="border-border">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Planos Ativos</CardTitle>
+            <Activity className="h-5 w-5 text-primary" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{data?.planos.length ?? 0}</div>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Charts Section */}
-      <Tabs defaultValue="subscriptions" className="space-y-6">
+      <Tabs defaultValue="tenants" className="space-y-6">
         <TabsList className="bg-muted">
-          <TabsTrigger value="subscriptions">Assinaturas</TabsTrigger>
-          <TabsTrigger value="growth">Crescimento</TabsTrigger>
+          <TabsTrigger value="tenants">Empresas (Tenants)</TabsTrigger>
+          <TabsTrigger value="plans">Distribuição de Planos</TabsTrigger>
+          <TabsTrigger value="audit">Auditoria</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="subscriptions" className="space-y-6">
-          <div className="grid gap-6 lg:grid-cols-2">
-            <Card className="border-border">
-              <CardHeader>
-                <CardTitle>Distribuição de Planos</CardTitle>
-                <CardDescription>
-                  Total de assinaturas ativas por plano
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <PieChart>
-                    <Pie
-                      data={subscriptionData}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                      outerRadius={100}
-                      fill="#8884d8"
-                      dataKey="value"
-                    >
-                      {subscriptionData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="mt-4 space-y-2">
-                  {subscriptionData.map((item, i) => (
-                    <div key={i} className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div 
-                          className="h-3 w-3 rounded-full" 
-                          style={{ backgroundColor: item.color }}
-                        />
-                        <span className="text-sm">{item.name}</span>
-                      </div>
-                      <Badge variant="secondary">{item.value} empresas</Badge>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-border">
-              <CardHeader>
-                <CardTitle>Resumo Financeiro</CardTitle>
-                <CardDescription>
-                  Receita por tipo de plano
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Plano Básico</span>
-                    <span className="font-semibold">R$ 14.355</span>
-                  </div>
-                  <div className="h-2 bg-muted rounded-full overflow-hidden">
-                    <div className="h-full bg-primary" style={{ width: "30%" }} />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Plano Empresa</span>
-                    <span className="font-semibold">R$ 26.611</span>
-                  </div>
-                  <div className="h-2 bg-muted rounded-full overflow-hidden">
-                    <div className="h-full bg-primary" style={{ width: "55%" }} />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Plano Master</span>
-                    <span className="font-semibold">R$ 7.534</span>
-                  </div>
-                  <div className="h-2 bg-muted rounded-full overflow-hidden">
-                    <div className="h-full bg-secondary" style={{ width: "15%" }} />
-                  </div>
-                </div>
-
-                <div className="pt-4 border-t border-border">
-                  <div className="flex items-center justify-between">
-                    <span className="font-semibold">Total MRR</span>
-                    <span className="text-2xl font-bold text-primary">R$ 48.500</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="growth" className="space-y-6">
+        <TabsContent value="tenants">
           <Card className="border-border">
             <CardHeader>
-              <CardTitle>Crescimento nos Últimos 6 Meses</CardTitle>
+              <CardTitle>Todas as empresas</CardTitle>
               <CardDescription>
-                Evolução de empresas e usuários na plataforma
+                Listagem cross-tenant disponível apenas para role master
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={400}>
-                <BarChart data={monthlyData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis 
-                    dataKey="month" 
-                    stroke="hsl(var(--muted-foreground))"
-                  />
-                  <YAxis stroke="hsl(var(--muted-foreground))" />
-                  <Tooltip 
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--card))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "var(--radius)"
-                    }}
-                  />
-                  <Legend />
-                  <Bar 
-                    dataKey="empresas" 
-                    fill="hsl(166, 100%, 50%)" 
-                    name="Empresas"
-                    radius={[8, 8, 0, 0]}
-                  />
-                  <Bar 
-                    dataKey="usuarios" 
-                    fill="hsl(42, 100%, 48%)" 
-                    name="Usuários"
-                    radius={[8, 8, 0, 0]}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Empresa</TableHead>
+                    <TableHead>Plano</TableHead>
+                    <TableHead>Usuários</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>BYOK</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {data?.empresas.map((empresa) => (
+                    <TableRow key={empresa.id}>
+                      <TableCell className="font-medium">{empresa.nome}</TableCell>
+                      <TableCell>
+                        {planosMap.get(empresa.plano_id ?? 0)?.nome ?? "—"}
+                      </TableCell>
+                      <TableCell>
+                        {usuariosPorEmpresa[empresa.id ?? 0] ?? 0}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={empresa.is_active ? "default" : "secondary"}>
+                          {empresa.status ?? "—"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {empresa.chave_api_configurada ? "Sim" : "Não"}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </CardContent>
           </Card>
+        </TabsContent>
 
-          <div className="grid gap-6 md:grid-cols-3">
-            <Card className="border-border">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Activity className="h-5 w-5 text-primary" />
-                  Churn Rate
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold">3.2%</div>
-                <p className="text-xs text-muted-foreground mt-2">
-                  -0.8% vs mês anterior
-                </p>
-              </CardContent>
-            </Card>
+        <TabsContent value="plans">
+          <Card className="border-border">
+            <CardHeader>
+              <CardTitle>Empresas por plano</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {Object.entries(planoCounts).map(([nome, count]) => (
+                <div key={nome} className="flex items-center justify-between">
+                  <span>{nome}</span>
+                  <Badge variant="secondary">{count} empresas</Badge>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-            <Card className="border-border">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5 text-secondary" />
-                  LTV Médio
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold">R$ 3.450</div>
-                <p className="text-xs text-muted-foreground mt-2">
-                  +12% vs mês anterior
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="border-border">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <DollarSign className="h-5 w-5 text-primary" />
-                  CAC
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold">R$ 287</div>
-                <p className="text-xs text-muted-foreground mt-2">
-                  -5% vs mês anterior
-                </p>
-              </CardContent>
-            </Card>
-          </div>
+        <TabsContent value="audit">
+          <Card className="border-border">
+            <CardHeader>
+              <CardTitle>Auditoria recente</CardTitle>
+              <CardDescription>Últimas ações administrativas registradas</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Data</TableHead>
+                    <TableHead>Ação</TableHead>
+                    <TableHead>Entidade</TableHead>
+                    <TableHead>Empresa ID</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {data?.auditoria.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-muted-foreground">
+                        Nenhum registro de auditoria ainda.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  {data?.auditoria.map((log) => (
+                    <TableRow key={log.id}>
+                      <TableCell>
+                        {new Date(log.created_at).toLocaleString("pt-BR")}
+                      </TableCell>
+                      <TableCell>{log.acao}</TableCell>
+                      <TableCell>{log.entidade_tipo}</TableCell>
+                      <TableCell>{log.empresa_id ?? "—"}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+export default function Master() {
+  return (
+    <RoleGate allowed={["master"]} title="Analytics restrito a usuários master">
+      <MasterContent />
+    </RoleGate>
   );
 }

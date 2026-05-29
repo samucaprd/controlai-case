@@ -5,17 +5,56 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Save, Key, Settings as SettingsIcon } from "lucide-react";
-import { useState } from "react";
+import { Save, Key, Settings as SettingsIcon, Users } from "lucide-react";
+import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useAuth } from "@/features/auth/auth-context";
+import { RoleGate } from "@/features/auth/role-gate";
+import { supabase } from "@/lib/supabase/client";
+import { toast } from "sonner";
 
-export default function Admin() {
+function parseInstrucoes(contexto: unknown): string {
+  if (contexto && typeof contexto === "object" && "instrucoes" in contexto) {
+    const val = (contexto as { instrucoes?: unknown }).instrucoes;
+    return typeof val === "string" ? val : "";
+  }
+  return "";
+}
+
+function AdminContent() {
+  const { empresa, refreshProfile } = useAuth();
   const [apiKey, setApiKey] = useState("");
   const [aiRules, setAiRules] = useState("");
   const [enableByok, setEnableByok] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
-  const handleSave = () => {
-    // TODO: Implement save logic
-    console.log("Settings saved");
+  useEffect(() => {
+    if (empresa?.contexto_ia) {
+      setAiRules(parseInstrucoes(empresa.contexto_ia));
+    }
+    setEnableByok(empresa?.chave_api_configurada ?? false);
+  }, [empresa]);
+
+  const handleSave = async () => {
+    if (!empresa?.id) return;
+
+    setIsSaving(true);
+    const { error } = await supabase
+      .from("empresas")
+      .update({
+        contexto_ia: { instrucoes: aiRules },
+      })
+      .eq("id", empresa.id);
+
+    setIsSaving(false);
+
+    if (error) {
+      toast.error("Erro ao salvar configurações.");
+      return;
+    }
+
+    await refreshProfile();
+    toast.success("Configurações de IA salvas.");
   };
 
   return (
@@ -25,6 +64,12 @@ export default function Admin() {
         <p className="text-muted-foreground mt-2">
           Gerencie as configurações do seu tenant
         </p>
+        <Button variant="link" className="mt-2 h-auto p-0" asChild>
+          <Link to="/dashboard/admin/colaboradores">
+            <Users className="mr-2 h-4 w-4 inline" />
+            Gerenciar colaboradores
+          </Link>
+        </Button>
       </div>
 
       <Tabs defaultValue="api" className="space-y-6">
@@ -44,7 +89,8 @@ export default function Admin() {
             <CardHeader>
               <CardTitle>BYOK - Bring Your Own Key</CardTitle>
               <CardDescription>
-                Use sua própria chave de API para maior controle e segurança
+                Persistência criptografada da chave API será habilitada na Fase 3.
+                Por enquanto, apenas a configuração de contexto IA é salva.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -61,6 +107,7 @@ export default function Admin() {
                   id="byok-toggle"
                   checked={enableByok}
                   onCheckedChange={setEnableByok}
+                  disabled
                 />
               </div>
 
@@ -74,26 +121,10 @@ export default function Admin() {
                     value={apiKey}
                     onChange={(e) => setApiKey(e.target.value)}
                     className="bg-input border-border font-mono"
+                    disabled
                   />
-                  <p className="text-xs text-muted-foreground">
-                    Sua chave será criptografada e armazenada com segurança
-                  </p>
                 </div>
               )}
-
-              <div className="pt-4 border-t border-border">
-                <h4 className="font-medium mb-2">Informações de Uso</h4>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="p-4 rounded-lg bg-muted/50">
-                    <p className="text-sm text-muted-foreground">Requisições este mês</p>
-                    <p className="text-2xl font-bold mt-1">12,458</p>
-                  </div>
-                  <div className="p-4 rounded-lg bg-muted/50">
-                    <p className="text-sm text-muted-foreground">Custo estimado</p>
-                    <p className="text-2xl font-bold mt-1">R$ 245,00</p>
-                  </div>
-                </div>
-              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -111,48 +142,14 @@ export default function Admin() {
                 <Label htmlFor="ai-rules">Instruções Customizadas</Label>
                 <Textarea
                   id="ai-rules"
-                  placeholder="Ex: Sempre seja formal e profissional. Utilize linguagem técnica quando apropriado..."
+                  placeholder="Ex: Sempre seja formal e profissional..."
                   value={aiRules}
                   onChange={(e) => setAiRules(e.target.value)}
                   className="min-h-[200px] bg-input border-border resize-none"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Estas instruções serão aplicadas a todas as conversas da sua empresa
+                  Salvo em empresas.contexto_ia (JSON) — usado pelo chat na Fase 4
                 </p>
-              </div>
-
-              <div className="space-y-4 pt-4 border-t border-border">
-                <h4 className="font-medium">Configurações Avançadas</h4>
-                
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Modo Criativo</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Respostas mais variadas e criativas
-                    </p>
-                  </div>
-                  <Switch />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Contexto Longo</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Mantém histórico estendido de conversas
-                    </p>
-                  </div>
-                  <Switch defaultChecked />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Análise de Sentimento</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Detecta e adapta ao tom do usuário
-                    </p>
-                  </div>
-                  <Switch defaultChecked />
-                </div>
               </div>
             </CardContent>
           </Card>
@@ -161,13 +158,22 @@ export default function Admin() {
 
       <div className="flex justify-end">
         <Button
-          onClick={handleSave}
+          onClick={() => void handleSave()}
+          disabled={isSaving}
           className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-glow-primary"
         >
           <Save className="mr-2 h-4 w-4" />
-          Salvar Configurações
+          {isSaving ? "Salvando..." : "Salvar Configurações"}
         </Button>
       </div>
     </div>
+  );
+}
+
+export default function Admin() {
+  return (
+    <RoleGate allowed={["admin", "master"]} title="Configurações restritas a administradores">
+      <AdminContent />
+    </RoleGate>
   );
 }

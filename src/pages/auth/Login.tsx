@@ -11,10 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
-import {
-  getDashboardPathForRole,
-  useAuth,
-} from "@/features/auth/auth-context";
+import { useAuth } from "@/features/auth/auth-context";
 import { toast } from "sonner";
 
 export default function Login() {
@@ -26,7 +23,7 @@ export default function Login() {
 
   useEffect(() => {
     if (!isLoading && session && role) {
-      navigate(getDashboardPathForRole(role), { replace: true });
+      navigate("/dashboard", { replace: true });
     }
   }, [isLoading, session, role, navigate]);
 

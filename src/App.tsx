@@ -10,11 +10,11 @@ import DashboardLayout from "./pages/dashboard/DashboardLayout";
 import Dashboard from "./pages/Dashboard";
 import Colaborador from "./pages/dashboard/Colaborador";
 import Admin from "./pages/dashboard/Admin";
+import AdminColaboradores from "./pages/dashboard/AdminColaboradores";
 import Master from "./pages/dashboard/Master";
 import NotFound from "./pages/NotFound";
 import { AuthProvider } from "@/features/auth/auth-context";
 import { RequireAuth } from "@/features/auth/require-auth";
-import { RequireRole } from "@/features/auth/require-role";
 
 const queryClient = new QueryClient();
 
@@ -33,15 +33,10 @@ const App = () => (
             <Route element={<RequireAuth />}>
               <Route path="/dashboard" element={<DashboardLayout />}>
                 <Route index element={<Dashboard />} />
-                <Route element={<RequireRole allowed={["user"]} />}>
-                  <Route path="colaborador" element={<Colaborador />} />
-                </Route>
-                <Route element={<RequireRole allowed={["admin"]} />}>
-                  <Route path="admin" element={<Admin />} />
-                </Route>
-                <Route element={<RequireRole allowed={["master"]} />}>
-                  <Route path="master" element={<Master />} />
-                </Route>
+                <Route path="colaborador" element={<Colaborador />} />
+                <Route path="admin" element={<Admin />} />
+                <Route path="admin/colaboradores" element={<AdminColaboradores />} />
+                <Route path="master" element={<Master />} />
               </Route>
             </Route>
 

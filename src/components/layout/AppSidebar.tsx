@@ -13,11 +13,12 @@ import {
 } from "@/components/ui/sidebar";
 
 const menuItems = [
-  { title: "Dashboard", url: "/dashboard", icon: Home },
-  { title: "Chat IA", url: "/dashboard/colaborador", icon: MessageSquare },
-  { title: "Configurações", url: "/dashboard/admin", icon: Settings },
-  { title: "Analytics", url: "/dashboard/master", icon: BarChart3 },
-];
+  { title: "Dashboard", url: "/dashboard", icon: Home, end: true },
+  { title: "Chat IA", url: "/dashboard/colaborador", icon: MessageSquare, end: false },
+  { title: "Configurações", url: "/dashboard/admin", icon: Settings, end: true },
+  { title: "Colaboradores", url: "/dashboard/admin/colaboradores", icon: Users, end: true },
+  { title: "Analytics", url: "/dashboard/master", icon: BarChart3, end: false },
+] as const;
 
 export function AppSidebar() {
   const { state } = useSidebar();
@@ -48,6 +49,7 @@ export function AppSidebar() {
                   <SidebarMenuButton asChild>
                     <NavLink
                       to={item.url}
+                      end={item.end}
                       className={({ isActive }) =>
                         isActive
                           ? "bg-sidebar-accent text-sidebar-primary"
