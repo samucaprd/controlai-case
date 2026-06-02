@@ -1,149 +1,126 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState } from "react";
+import { ChevronDown, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Send, Bot, User } from "lucide-react";
-import { useState } from "react";
-
-interface Message {
-  role: "user" | "assistant";
-  content: string;
-  timestamp: Date;
-}
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { AgenteQuickCard } from "@/components/chat/agente-quick-card";
+import { useChat } from "@/features/chat/chat-context";
+import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 export default function Colaborador() {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      role: "assistant",
-      content: "Olá! Sou seu assistente IA. Como posso ajudar você hoje?",
-      timestamp: new Date()
-    }
-  ]);
-  const [input, setInput] = useState("");
+  const {
+    user,
+    agentes,
+    agentesPopulares,
+    selectedAgenteId,
+    setSelectedAgenteId,
+  } = useChat();
+  const [prompt, setPrompt] = useState("");
+  const [agentesOpen, setAgentesOpen] = useState(true);
+
+  const primeiroNome = user.nome.split(" ")[0];
 
   const handleSend = () => {
-    if (!input.trim()) return;
-
-    const newMessage: Message = {
-      role: "user",
-      content: input,
-      timestamp: new Date()
-    };
-
-    setMessages([...messages, newMessage]);
-    setInput("");
-
-    // Simular resposta da IA
-    setTimeout(() => {
-      setMessages(prev => [...prev, {
-        role: "assistant",
-        content: "Esta é uma resposta simulada da IA. Integre com sua API de IA preferida para funcionalidade completa.",
-        timestamp: new Date()
-      }]);
-    }, 1000);
+    if (!prompt.trim()) return;
+    if (!selectedAgenteId) {
+      toast.message("Selecione um agente antes de enviar.");
+      setAgentesOpen(true);
+      return;
+    }
+    toast.success("Prompt enviado (layout) — chat completo na Fase 4.");
+    setPrompt("");
   };
 
   return (
-    <div className="h-[calc(100vh-8rem)]">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold">Chat com IA</h1>
-        <p className="text-muted-foreground mt-2">
-          Converse com seu assistente inteligente
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 py-4">
+      <header className="text-center">
+        <h1 className="text-3xl font-bold tracking-tight md:text-4xl">
+          Olá,{" "}
+          <span className="bg-hero-gradient bg-clip-text text-transparent">
+            {primeiroNome}
+          </span>
+        </h1>
+        <p className="mt-2 text-muted-foreground">
+          ControlIA para {user.empresaNome}
         </p>
-      </div>
+      </header>
 
-      <div className="grid h-[calc(100%-5rem)] gap-6 lg:grid-cols-12">
-        {/* Chat History Sidebar */}
-        <Card className="border-border lg:col-span-3">
-          <CardHeader>
-            <CardTitle className="text-lg">Histórico</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ScrollArea className="h-[calc(100vh-20rem)]">
-              <div className="space-y-2">
-                {["Conversa 1", "Conversa 2", "Conversa 3", "Conversa 4"].map((chat, i) => (
-                  <Button
-                    key={i}
-                    variant="ghost"
-                    className="w-full justify-start"
-                  >
-                    {chat}
-                  </Button>
-                ))}
-              </div>
-            </ScrollArea>
-          </CardContent>
-        </Card>
+      {agentesPopulares.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-sm font-medium text-muted-foreground">
+            Agentes Populares
+          </h2>
+          <div className="grid grid-cols-3 gap-3">
+            {agentesPopulares.map((agente) => (
+              <AgenteQuickCard
+                key={agente.id}
+                agente={agente}
+                compact
+                selected={selectedAgenteId === agente.id}
+                onSelect={() => setSelectedAgenteId(agente.id)}
+              />
+            ))}
+          </div>
+        </section>
+      )}
 
-        {/* Main Chat Area */}
-        <Card className="border-border lg:col-span-9">
-          <CardContent className="p-0 flex flex-col h-full">
-            {/* Messages */}
-            <ScrollArea className="flex-1 p-6">
-              <div className="space-y-6">
-                {messages.map((message, index) => (
-                  <div
-                    key={index}
-                    className={`flex gap-3 ${
-                      message.role === "user" ? "flex-row-reverse" : ""
-                    }`}
-                  >
-                    <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
-                      message.role === "user" 
-                        ? "bg-primary" 
-                        : "bg-muted"
-                    }`}>
-                      {message.role === "user" ? (
-                        <User className="h-4 w-4" />
-                      ) : (
-                        <Bot className="h-4 w-4" />
-                      )}
-                    </div>
-                    <div className={`flex-1 space-y-2 ${
-                      message.role === "user" ? "text-right" : ""
-                    }`}>
-                      <div className={`inline-block rounded-lg px-4 py-2 ${
-                        message.role === "user"
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-muted"
-                      }`}>
-                        {message.content}
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        {message.timestamp.toLocaleTimeString()}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </ScrollArea>
+      <section className="relative">
+        <Textarea
+          placeholder="Insira um comando para o ControlIA"
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              handleSend();
+            }
+          }}
+          className="min-h-[120px] resize-none border-border bg-card pr-14 text-base"
+        />
+        <Button
+          type="button"
+          size="icon"
+          className="absolute bottom-3 right-3 h-10 w-10 rounded-full bg-primary text-primary-foreground shadow-glow-primary hover:bg-primary/90"
+          onClick={handleSend}
+          aria-label="Enviar prompt"
+        >
+          <Send className="h-4 w-4" />
+        </Button>
+      </section>
 
-            {/* Input Area */}
-            <div className="border-t border-border p-4">
-              <div className="flex gap-2">
-                <Textarea
-                  placeholder="Digite sua mensagem..."
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      handleSend();
-                    }
-                  }}
-                  className="min-h-[80px] bg-input border-border resize-none"
+      <Collapsible open={agentesOpen} onOpenChange={setAgentesOpen}>
+        <CollapsibleTrigger className="flex w-full items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground">
+          <ChevronDown
+            className={cn(
+              "h-4 w-4 transition-transform",
+              agentesOpen && "rotate-180",
+            )}
+          />
+          Escolha um Agente
+        </CollapsibleTrigger>
+        <CollapsibleContent className="mt-4">
+          <div className="rounded-xl border border-border bg-card/50 p-4">
+            <p className="mb-4 text-center text-sm text-muted-foreground">
+              Selecione um Agente
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {agentes.map((agente) => (
+                <AgenteQuickCard
+                  key={agente.id}
+                  agente={agente}
+                  selected={selectedAgenteId === agente.id}
+                  onSelect={() => setSelectedAgenteId(agente.id)}
                 />
-                <Button
-                  onClick={handleSend}
-                  className="bg-primary text-primary-foreground hover:bg-primary/90"
-                >
-                  <Send className="h-4 w-4" />
-                </Button>
-              </div>
+              ))}
             </div>
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
     </div>
   );
 }

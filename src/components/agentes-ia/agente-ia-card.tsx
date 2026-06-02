@@ -1,10 +1,10 @@
-import { useState } from "react";
 import { Pencil, Trash2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { useAgentes } from "@/features/agentes-ia/agentes-context";
 import type { AgenteIA } from "./types";
 
 interface AgenteIACardProps {
@@ -13,8 +13,7 @@ interface AgenteIACardProps {
 }
 
 export function AgenteIACard({ agente, onEdit }: AgenteIACardProps) {
-  const [isActive, setIsActive] = useState(agente.is_active);
-  const [isPopular, setIsPopular] = useState(agente.is_popular);
+  const { updateAgente } = useAgentes();
   const Icon = agente.icone;
 
   return (
@@ -38,8 +37,10 @@ export function AgenteIACard({ agente, onEdit }: AgenteIACardProps) {
             </div>
           </div>
           <Switch
-            checked={isActive}
-            onCheckedChange={setIsActive}
+            checked={agente.is_active}
+            onCheckedChange={(checked) =>
+              updateAgente(agente.id, { is_active: checked })
+            }
             aria-label={`Agente ${agente.nome} ativo`}
           />
         </div>
@@ -50,10 +51,10 @@ export function AgenteIACard({ agente, onEdit }: AgenteIACardProps) {
             <span
               className={cn(
                 "font-medium",
-                isActive ? "text-primary" : "text-muted-foreground",
+                agente.is_active ? "text-primary" : "text-muted-foreground",
               )}
             >
-              {isActive ? "Ativo" : "Inativo"}
+              {agente.is_active ? "Ativo" : "Inativo"}
             </span>
           </div>
 
@@ -66,9 +67,11 @@ export function AgenteIACard({ agente, onEdit }: AgenteIACardProps) {
             </Label>
             <Switch
               id={`popular-${agente.id}`}
-              checked={isPopular}
-              onCheckedChange={setIsPopular}
-              disabled={!isActive}
+              checked={agente.is_popular}
+              onCheckedChange={(checked) =>
+                updateAgente(agente.id, { is_popular: checked })
+              }
+              disabled={!agente.is_active}
             />
           </div>
 

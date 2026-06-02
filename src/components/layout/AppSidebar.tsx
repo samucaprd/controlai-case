@@ -11,10 +11,11 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { ChatHistorySidebar } from "@/components/layout/ChatHistorySidebar";
 
 const menuItems = [
   { title: "Dashboard", url: "/dashboard", icon: Home },
-  { title: "Chat IA", url: "/dashboard/colaborador", icon: MessageSquare },
+  { title: "Chats", url: "/dashboard/colaborador", icon: MessageSquare },
   { title: "Agentes IA", url: "/dashboard/agentes-ia", icon: Bot },
   { title: "Configurações", url: "/dashboard/admin", icon: Settings },
   { title: "Administração", url: "/dashboard/master", icon: BarChart3 },
@@ -64,6 +65,8 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        <ChatHistorySidebar />
       </SidebarContent>
     </Sidebar>
   );

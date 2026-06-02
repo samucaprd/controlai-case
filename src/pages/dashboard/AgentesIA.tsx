@@ -4,10 +4,11 @@ import { Button } from "@/components/ui/button";
 import { AgenteIACard } from "@/components/agentes-ia/agente-ia-card";
 import { AgentesIAStats } from "@/components/agentes-ia/agentes-ia-stats";
 import { AgenteFormDialog } from "@/components/agentes-ia/agente-form-dialog";
-import { mockAgentesIA } from "@/components/agentes-ia/mock-agentes";
+import { useAgentes } from "@/features/agentes-ia/agentes-context";
 import type { AgenteFormMode, AgenteIA } from "@/components/agentes-ia/types";
 
 export default function AgentesIA() {
+  const { agentes } = useAgentes();
   const [formOpen, setFormOpen] = useState(false);
   const [formMode, setFormMode] = useState<AgenteFormMode>("create");
   const [editingAgente, setEditingAgente] = useState<AgenteIA | null>(null);
@@ -50,10 +51,10 @@ export default function AgentesIA() {
         agente={editingAgente}
       />
 
-      <AgentesIAStats agentes={mockAgentesIA} />
+      <AgentesIAStats agentes={agentes} />
 
       <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
-        {mockAgentesIA.map((agente) => (
+        {agentes.map((agente) => (
           <AgenteIACard key={agente.id} agente={agente} onEdit={openEdit} />
         ))}
       </div>

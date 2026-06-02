@@ -10,8 +10,17 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { LogOut, Settings, User } from "lucide-react";
+import { useChat } from "@/features/chat/chat-context";
 
 export function AppHeader() {
+  const { user } = useChat();
+  const initials = user.nome
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+
   return (
     <header className="sticky top-0 z-50 h-16 border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60">
       <div className="flex h-full items-center gap-4 px-4">
@@ -24,7 +33,7 @@ export function AppHeader() {
             <Button variant="ghost" className="relative h-10 w-10 rounded-full">
               <Avatar>
                 <AvatarFallback className="bg-primary text-primary-foreground">
-                  U
+                  {initials}
                 </AvatarFallback>
               </Avatar>
             </Button>

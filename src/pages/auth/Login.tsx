@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Link, useNavigate } from "react-router-dom";
 import { useState } from "react";
+import { persistChatUser } from "@/features/chat/chat-context";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -12,8 +13,19 @@ export default function Login() {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Implement authentication logic
-    navigate("/dashboard");
+    const emailNorm = email.trim().toLowerCase();
+    const isMaster =
+      emailNorm.includes("master") || emailNorm.includes("samul");
+    const nomeFromEmail = email.split("@")[0] || "Usuário";
+    const displayNome = isMaster
+      ? "Master"
+      : nomeFromEmail.charAt(0).toUpperCase() + nomeFromEmail.slice(1);
+    persistChatUser({
+      id: isMaster ? "user-master" : `user-${emailNorm || "demo"}`,
+      nome: displayNome,
+      empresaNome: "sua Empresa",
+    });
+    navigate("/dashboard/colaborador");
   };
 
   return (
