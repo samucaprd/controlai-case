@@ -9,6 +9,7 @@ import Register from "./pages/auth/Register";
 import DashboardLayout from "./pages/dashboard/DashboardLayout";
 import Dashboard from "./pages/Dashboard";
 import Colaborador from "./pages/dashboard/Colaborador";
+import AgentesIA from "./pages/dashboard/AgentesIA";
 import Admin from "./pages/dashboard/Admin";
 import Master from "./pages/dashboard/Master";
 import NotFound from "./pages/NotFound";
@@ -29,6 +30,7 @@ const App = () => (
           <Route path="/dashboard" element={<DashboardLayout />}>
             <Route index element={<Dashboard />} />
             <Route path="colaborador" element={<Colaborador />} />
+            <Route path="agentes-ia" element={<AgentesIA />} />
             <Route path="admin" element={<Admin />} />
             <Route path="master" element={<Master />} />
           </Route>

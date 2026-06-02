@@ -1,4 +1,4 @@
-import { Home, MessageSquare, Settings, BarChart3, Users } from "lucide-react";
+import { Home, MessageSquare, Settings, BarChart3, Bot } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import {
   Sidebar,
@@ -15,8 +15,9 @@ import {
 const menuItems = [
   { title: "Dashboard", url: "/dashboard", icon: Home },
   { title: "Chat IA", url: "/dashboard/colaborador", icon: MessageSquare },
+  { title: "Agentes IA", url: "/dashboard/agentes-ia", icon: Bot },
   { title: "Configurações", url: "/dashboard/admin", icon: Settings },
-  { title: "Analytics", url: "/dashboard/master", icon: BarChart3 },
+  { title: "Administração", url: "/dashboard/master", icon: BarChart3 },
 ];
 
 export function AppSidebar() {
