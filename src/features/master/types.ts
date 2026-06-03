@@ -24,6 +24,7 @@ export interface MasterEmpresa {
   preco_mensal: number;
   usuarios: number;
   usuarios_ativos: number;
+  ultimo_acesso: string | null;
 }
 
 export interface MasterPlatformStats {

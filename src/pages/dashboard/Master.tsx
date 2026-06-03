@@ -3,7 +3,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MasterStatsSection } from "@/components/master/master-stats-section";
 import { MasterGerenciarClientesTab } from "@/components/master/master-gerenciar-clientes-tab";
 import { MasterGerenciarPlanosTab } from "@/components/master/master-gerenciar-planos-tab";
+import { MasterAuditoriaTab } from "@/components/master/master-auditoria-tab";
 import { useMasterPlatform } from "@/features/master/use-master-platform";
+import { useMasterAudit } from "@/features/master/use-master-audit";
 import { cn } from "@/lib/utils";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
@@ -25,6 +27,14 @@ function MasterContent() {
     togglePlanoActive,
     useSupabase,
   } = useMasterPlatform();
+
+  const {
+    logs: auditLogs,
+    isLoading: auditLoading,
+    search: auditSearch,
+    setSearch: setAuditSearch,
+    refresh: refreshAudit,
+  } = useMasterAudit();
 
   return (
     <div className="space-y-8">
@@ -50,8 +60,8 @@ function MasterContent() {
       <Tabs defaultValue="clientes" className="space-y-6">
         <TabsList
           className={cn(
-            "inline-flex h-auto w-full max-w-md rounded-full bg-muted/60 p-1",
-            "grid grid-cols-2",
+            "inline-flex h-auto w-full max-w-2xl rounded-full bg-muted/60 p-1",
+            "grid grid-cols-3",
           )}
         >
           <TabsTrigger
@@ -74,6 +84,16 @@ function MasterContent() {
           >
             Gerenciar Planos
           </TabsTrigger>
+          <TabsTrigger
+            value="auditoria"
+            className={cn(
+              "rounded-full px-4 py-2.5 text-sm font-medium transition-all",
+              "data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-sm",
+              "data-[state=inactive]:text-muted-foreground",
+            )}
+          >
+            Auditoria
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="clientes" className="mt-0 focus-visible:outline-none">
@@ -83,9 +103,18 @@ function MasterContent() {
             isLoading={isLoading}
             search={searchEmpresa}
             onSearchChange={setSearchEmpresa}
-            onCreate={createEmpresa}
-            onUpdate={updateEmpresa}
-            onDelete={deleteEmpresa}
+            onCreate={async (input) => {
+              await createEmpresa(input);
+              void refreshAudit();
+            }}
+            onUpdate={async (id, input) => {
+              await updateEmpresa(id, input);
+              void refreshAudit();
+            }}
+            onDelete={async (id) => {
+              await deleteEmpresa(id);
+              void refreshAudit();
+            }}
           />
         </TabsContent>
 
@@ -93,10 +122,31 @@ function MasterContent() {
           <MasterGerenciarPlanosTab
             planos={planos}
             isLoading={isLoading}
-            onCreate={createPlano}
-            onUpdate={updatePlano}
-            onDelete={deletePlano}
-            onToggleActive={togglePlanoActive}
+            onCreate={async (input) => {
+              await createPlano(input);
+              void refreshAudit();
+            }}
+            onUpdate={async (id, input) => {
+              await updatePlano(id, input);
+              void refreshAudit();
+            }}
+            onDelete={async (id) => {
+              await deletePlano(id);
+              void refreshAudit();
+            }}
+            onToggleActive={async (id, active) => {
+              await togglePlanoActive(id, active);
+              void refreshAudit();
+            }}
+          />
+        </TabsContent>
+
+        <TabsContent value="auditoria" className="mt-0 focus-visible:outline-none">
+          <MasterAuditoriaTab
+            logs={auditLogs}
+            isLoading={auditLoading}
+            search={auditSearch}
+            onSearchChange={setAuditSearch}
           />
         </TabsContent>
       </Tabs>

@@ -158,18 +158,38 @@ export function MasterGerenciarClientesTab({
                       {empresa.email}
                     </p>
                   )}
-                  <Badge
-                    variant="outline"
-                    className="mt-2 gap-1.5 font-normal border-border"
-                  >
-                    <span
-                      className="h-2 w-2 rounded-full"
-                      style={{
-                        backgroundColor: empresa.plano_cor ?? "#6B7280",
-                      }}
-                    />
-                    {empresa.plano_nome}
-                  </Badge>
+                  <div className="flex flex-wrap items-center gap-2 mt-2">
+                    <Badge
+                      variant="outline"
+                      className="gap-1.5 font-normal border-border"
+                    >
+                      <span
+                        className="h-2 w-2 rounded-full"
+                        style={{
+                          backgroundColor: empresa.plano_cor ?? "#6B7280",
+                        }}
+                      />
+                      {empresa.plano_nome}
+                    </Badge>
+                    <Badge
+                      variant={
+                        !empresa.is_active || empresa.status === "suspensa"
+                          ? "destructive"
+                          : empresa.status === "trial"
+                            ? "secondary"
+                            : "default"
+                      }
+                      className="font-normal"
+                    >
+                      {!empresa.is_active
+                        ? "Inativa"
+                        : empresa.status === "suspensa"
+                          ? "Suspensa"
+                          : empresa.status === "trial"
+                            ? "Trial"
+                            : "Ativa"}
+                    </Badge>
+                  </div>
                 </div>
               </div>
 
@@ -181,6 +201,17 @@ export function MasterGerenciarClientesTab({
                     {empresa.usuarios_ativos} ativo
                     {empresa.usuarios_ativos !== 1 ? "s" : ""}
                   </p>
+                  {empresa.ultimo_acesso && (
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Último acesso:{" "}
+                      {new Intl.DateTimeFormat("pt-BR", {
+                        day: "2-digit",
+                        month: "short",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      }).format(new Date(empresa.ultimo_acesso))}
+                    </p>
+                  )}
                 </div>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>

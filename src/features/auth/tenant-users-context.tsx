@@ -13,6 +13,7 @@ import { mockTenantUsers, type TenantUser } from "./mock-tenant-users";
 import { useSession } from "./session-context";
 import type { AppRole } from "./types";
 import { deleteTenantUser } from "@/lib/api/delete-tenant-user";
+import { logAudit } from "@/lib/audit/log-audit";
 import { inviteTenantUser, InviteUserError } from "@/lib/api/invite-tenant-user";
 import { getSupabase } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/is-configured";
@@ -234,6 +235,12 @@ export function TenantUsersProvider({ children }: { children: ReactNode }) {
           nome_completo: input.nome,
           role: input.role,
         });
+        await logAudit({
+          acao: "usuario_convidado",
+          entidade_tipo: "perfil",
+          empresa_id: empresaIdNumeric,
+          detalhes: { email: input.email, role: input.role },
+        });
         await fetchFromSupabase();
         return;
       }
@@ -249,7 +256,7 @@ export function TenantUsersProvider({ children }: { children: ReactNode }) {
       };
       applyAndPersist((prev) => [...prev, novo]);
     },
-    [useSupabase, user.empresaId, applyAndPersist, fetchFromSupabase],
+    [useSupabase, user.empresaId, empresaIdNumeric, applyAndPersist, fetchFromSupabase],
   );
 
   const saveUser = useCallback(
@@ -263,8 +270,17 @@ export function TenantUsersProvider({ children }: { children: ReactNode }) {
         status: input.status,
         ...(useSupabase ? {} : { email: input.email.trim().toLowerCase() }),
       });
+
+      if (useSupabase) {
+        await logAudit({
+          acao: "usuario_atualizado",
+          entidade_tipo: "perfil",
+          empresa_id: empresaIdNumeric,
+          detalhes: { email: target.email, role: input.role, status: input.status },
+        });
+      }
     },
-    [users, updateUser, useSupabase],
+    [users, updateUser, useSupabase, empresaIdNumeric],
   );
 
   const removeUser = useCallback(
@@ -280,6 +296,12 @@ export function TenantUsersProvider({ children }: { children: ReactNode }) {
           motivo: options?.motivo,
           notify_by_email: options?.notifyByEmail,
         });
+        await logAudit({
+          acao: "usuario_excluido",
+          entidade_tipo: "perfil",
+          empresa_id: empresaIdNumeric,
+          detalhes: { email: target.email, motivo: options?.motivo },
+        });
         await fetchFromSupabase();
         return result;
       }
@@ -287,7 +309,7 @@ export function TenantUsersProvider({ children }: { children: ReactNode }) {
       applyAndPersist((prev) => prev.filter((u) => u.id !== id));
       return { email_sent: false, email_warning: null };
     },
-    [users, useSupabase, applyAndPersist, fetchFromSupabase],
+    [users, useSupabase, empresaIdNumeric, applyAndPersist, fetchFromSupabase],
   );
 
   const value = useMemo(

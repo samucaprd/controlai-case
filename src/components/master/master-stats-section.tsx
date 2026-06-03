@@ -31,8 +31,10 @@ export function MasterStatsSection({ stats }: MasterStatsSectionProps) {
             <div>
               <p className="text-sm text-muted-foreground">Receita Mensal</p>
               <p className="text-3xl font-bold mt-1">{formatBRL(stats.receitaMensal)}</p>
-              <p className="text-xs text-primary mt-1">
-                +{stats.receitaDelta}% vs mês anterior
+              <p className="text-xs text-muted-foreground mt-1">
+                {stats.receitaDelta > 0
+                  ? `+${stats.receitaDelta}% vs mês anterior`
+                  : "Baseada em empresas ativas"}
               </p>
             </div>
             <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/15">
@@ -61,8 +63,10 @@ export function MasterStatsSection({ stats }: MasterStatsSectionProps) {
             <div>
               <p className="text-sm text-muted-foreground">Taxa de Churn</p>
               <p className="text-3xl font-bold mt-1">{stats.churnRate}%</p>
-              <p className="text-xs text-primary mt-1">
-                {stats.churnDelta}% vs mês anterior
+              <p className="text-xs text-muted-foreground mt-1">
+                {stats.churnDelta !== 0
+                  ? `${stats.churnDelta}% vs mês anterior`
+                  : "Taxa de inativas/suspensas"}
               </p>
             </div>
             <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/15">

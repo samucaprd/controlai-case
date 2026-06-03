@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { logAudit } from "@/lib/audit/log-audit";
 import { getSupabase } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/is-configured";
 import type {
@@ -69,14 +70,21 @@ export function useMasterPlatform() {
 
       const { data: perfisData } = await supabase
         .from("perfis")
-        .select("empresa_id, status");
+        .select("empresa_id, status, ultimo_acesso");
 
-      const counts = new Map<number, { total: number; ativos: number }>();
+      const counts = new Map<
+        number,
+        { total: number; ativos: number; ultimo_acesso: string | null }
+      >();
       for (const p of perfisData ?? []) {
         const eid = p.empresa_id as number;
-        const cur = counts.get(eid) ?? { total: 0, ativos: 0 };
+        const cur = counts.get(eid) ?? { total: 0, ativos: 0, ultimo_acesso: null };
         cur.total += 1;
         if (p.status === "ativo") cur.ativos += 1;
+        const ua = p.ultimo_acesso as string | null;
+        if (ua && (!cur.ultimo_acesso || ua > cur.ultimo_acesso)) {
+          cur.ultimo_acesso = ua;
+        }
         counts.set(eid, cur);
       }
 
@@ -84,7 +92,7 @@ export function useMasterPlatform() {
         const r = row as Record<string, unknown>;
         const plano = r.planos as Record<string, unknown> | null;
         const eid = r.id as number;
-        const c = counts.get(eid) ?? { total: 0, ativos: 0 };
+        const c = counts.get(eid) ?? { total: 0, ativos: 0, ultimo_acesso: null };
         return {
           id: eid,
           nome: (r.nome as string) ?? "",
@@ -98,6 +106,7 @@ export function useMasterPlatform() {
           preco_mensal: Number(plano?.preco_mensal ?? 0),
           usuarios: c.total,
           usuarios_ativos: c.ativos,
+          ultimo_acesso: c.ultimo_acesso,
         };
       });
 
@@ -142,14 +151,19 @@ export function useMasterPlatform() {
       }
     }
 
+    const churnRate =
+      empresas.length > 0
+        ? Number(((suspensas.length / empresas.length) * 100).toFixed(1))
+        : 0;
+
     return {
       totalEmpresas: empresas.length,
       empresasAtivas: ativas.length,
       receitaMensal,
       empresasSuspensas: suspensas.length,
-      churnRate: 3.2,
-      churnDelta: -0.8,
-      receitaDelta: 12.5,
+      churnRate,
+      churnDelta: 0,
+      receitaDelta: 0,
       empresasPorPlano,
     };
   }, [empresas, planos]);
@@ -174,15 +188,26 @@ export function useMasterPlatform() {
   const createEmpresa = useCallback(
     async (input: EmpresaFormInput) => {
       const supabase = getSupabase();
-      const { error } = await supabase.from("empresas").insert({
-        nome: input.nome.trim(),
-        email: input.email.trim() || null,
-        telefone: input.telefone.trim() || null,
-        plano_id: input.plano_id,
-        status: input.status,
-        is_active: input.is_active,
-      });
+      const { data, error } = await supabase
+        .from("empresas")
+        .insert({
+          nome: input.nome.trim(),
+          email: input.email.trim() || null,
+          telefone: input.telefone.trim() || null,
+          plano_id: input.plano_id,
+          status: input.status,
+          is_active: input.is_active,
+        })
+        .select("id")
+        .single();
       if (error) throw error;
+      await logAudit({
+        acao: "empresa_criada",
+        entidade_tipo: "empresa",
+        entidade_id: data.id as number,
+        empresa_id: data.id as number,
+        detalhes: { nome: input.nome },
+      });
       await fetchData();
     },
     [fetchData],
@@ -203,6 +228,13 @@ export function useMasterPlatform() {
         })
         .eq("id", id);
       if (error) throw error;
+      await logAudit({
+        acao: "empresa_atualizada",
+        entidade_tipo: "empresa",
+        entidade_id: id,
+        empresa_id: id,
+        detalhes: { nome: input.nome, status: input.status },
+      });
       await fetchData();
     },
     [fetchData],
@@ -213,6 +245,12 @@ export function useMasterPlatform() {
       const supabase = getSupabase();
       const { error } = await supabase.from("empresas").delete().eq("id", id);
       if (error) throw error;
+      await logAudit({
+        acao: "empresa_excluida",
+        entidade_tipo: "empresa",
+        entidade_id: id,
+        empresa_id: id,
+      });
       await fetchData();
     },
     [fetchData],
@@ -222,18 +260,28 @@ export function useMasterPlatform() {
     async (input: PlanoFormInput) => {
       const supabase = getSupabase();
       const maxUsuarios = input.usuarios_ilimitados ? 9999 : input.max_usuarios;
-      const { error } = await supabase.from("planos").insert({
-        nome: input.nome.trim(),
-        preco_mensal: input.preco_mensal,
-        max_usuarios: maxUsuarios,
-        max_agentes: input.max_agentes,
-        limite_mensagens_mes: input.limite_mensagens_mes,
-        stripe_price_id: input.stripe_price_id.trim() || "price_placeholder",
-        features: input.features,
-        is_active: input.is_active,
-        cor: input.cor,
-      });
+      const { data, error } = await supabase
+        .from("planos")
+        .insert({
+          nome: input.nome.trim(),
+          preco_mensal: input.preco_mensal,
+          max_usuarios: maxUsuarios,
+          max_agentes: input.max_agentes,
+          limite_mensagens_mes: input.limite_mensagens_mes,
+          stripe_price_id: input.stripe_price_id.trim() || "price_placeholder",
+          features: input.features,
+          is_active: input.is_active,
+          cor: input.cor,
+        })
+        .select("id")
+        .single();
       if (error) throw error;
+      await logAudit({
+        acao: "plano_criado",
+        entidade_tipo: "plano",
+        entidade_id: data.id as number,
+        detalhes: { nome: input.nome },
+      });
       await fetchData();
     },
     [fetchData],
@@ -258,6 +306,12 @@ export function useMasterPlatform() {
         })
         .eq("id", id);
       if (error) throw error;
+      await logAudit({
+        acao: "plano_atualizado",
+        entidade_tipo: "plano",
+        entidade_id: id,
+        detalhes: { nome: input.nome },
+      });
       await fetchData();
     },
     [fetchData],
@@ -268,6 +322,11 @@ export function useMasterPlatform() {
       const supabase = getSupabase();
       const { error } = await supabase.from("planos").delete().eq("id", id);
       if (error) throw error;
+      await logAudit({
+        acao: "plano_excluido",
+        entidade_tipo: "plano",
+        entidade_id: id,
+      });
       await fetchData();
     },
     [fetchData],
@@ -281,6 +340,12 @@ export function useMasterPlatform() {
         .update({ is_active: isActive })
         .eq("id", id);
       if (error) throw error;
+      await logAudit({
+        acao: "plano_toggle",
+        entidade_tipo: "plano",
+        entidade_id: id,
+        detalhes: { is_active: isActive },
+      });
       await fetchData();
     },
     [fetchData],
