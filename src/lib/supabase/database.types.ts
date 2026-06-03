@@ -55,26 +55,19 @@ export type Database = {
         Update: Record<string, unknown>;
         Relationships: [];
       };
-      agentes_ia: {
-        Row: Record<string, unknown>;
-        Insert: Record<string, unknown>;
-        Update: Record<string, unknown>;
-        Relationships: [];
-      };
-      conversas: {
-        Row: Record<string, unknown>;
-        Insert: Record<string, unknown>;
-        Update: Record<string, unknown>;
-        Relationships: [];
-      };
-      uso_recursos: {
-        Row: Record<string, unknown>;
-        Insert: Record<string, unknown>;
-        Update: Record<string, unknown>;
-        Relationships: [];
-      };
       auditoria: {
-        Row: Record<string, unknown>;
+        Row: {
+          id: number;
+          user_id: string | null;
+          acao: string;
+          entidade_tipo: string;
+          entidade_id: number | null;
+          empresa_id: number | null;
+          detalhes: Json;
+          ip_address: string | null;
+          user_agent: string | null;
+          created_at: string;
+        };
         Insert: Record<string, unknown>;
         Update: Record<string, unknown>;
         Relationships: [];
@@ -104,7 +97,18 @@ export type Database = {
         Relationships: [];
       };
     };
-    Functions: Record<string, never>;
+    Functions: {
+      log_auditoria: {
+        Args: {
+          p_acao: string;
+          p_entidade_tipo: string;
+          p_entidade_id?: number | null;
+          p_empresa_id?: number | null;
+          p_detalhes?: Json;
+        };
+        Returns: number;
+      };
+    };
     Enums: {
       app_role: AppRole;
     };

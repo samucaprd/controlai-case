@@ -1,11 +1,8 @@
-import { useQuery } from "@tanstack/react-query";
-import { Link } from "react-router-dom";
+import { Navigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Users, MessageSquare, Settings, BarChart3 } from "lucide-react";
-import { useAuth } from "@/features/auth/auth-context";
-import { supabase } from "@/lib/supabase/client";
+import { Users, MessageSquare, TrendingUp, Activity } from "lucide-react";
+import { useSession } from "@/features/auth/session-context";
 
 async function fetchDashboardStats(empresaId: number | null, isMaster: boolean) {
   if (isMaster) {
@@ -47,14 +44,11 @@ const quickLinks = [
 ] as const;
 
 export default function Dashboard() {
-  const { role, empresa, perfil } = useAuth();
-  const isMaster = role === "master";
+  const { isColaborador } = useSession();
 
-  const { data: stats } = useQuery({
-    queryKey: ["dashboard-stats", empresa?.id, isMaster],
-    queryFn: () => fetchDashboardStats(empresa?.id ?? null, isMaster),
-    enabled: role != null,
-  });
+  if (isColaborador) {
+    return <Navigate to="/dashboard/colaborador" replace />;
+  }
 
   return (
     <div className="space-y-8">

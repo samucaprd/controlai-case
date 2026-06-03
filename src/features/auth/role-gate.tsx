@@ -8,40 +8,38 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { useAuth } from "./auth-context";
-import type { AppRole } from "@/lib/supabase/database.types";
+import { useSession } from "./session-context";
+import type { AppRole } from "./types";
 
 interface RoleGateProps {
   allowed: AppRole[];
   children: ReactNode;
   title?: string;
+  redirectTo?: string;
 }
 
-export function RoleGate({ allowed, children, title = "Acesso restrito" }: RoleGateProps) {
-  const { role, isLoading } = useAuth();
+export function RoleGate({
+  allowed,
+  children,
+  title = "Acesso restrito",
+  redirectTo = "/dashboard/colaborador",
+}: RoleGateProps) {
+  const { user, isColaborador } = useSession();
 
-  if (isLoading) {
-    return (
-      <div className="flex min-h-[40vh] items-center justify-center">
-        <p className="text-muted-foreground">Carregando...</p>
-      </div>
-    );
-  }
-
-  if (!role || !allowed.includes(role)) {
+  if (!allowed.includes(user.role)) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center p-4">
         <Card className="w-full max-w-md border-border">
           <CardHeader>
             <CardTitle>{title}</CardTitle>
             <CardDescription>
-              Seu perfil ({role ?? "sem role"}) não tem permissão para esta área.
-              Use o menu para acessar as seções disponíveis.
+              Seu perfil ({user.role}) não tem permissão para esta área.
+              {isColaborador && " Colaboradores acessam apenas Chats."}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <Button asChild variant="outline">
-              <Link to="/dashboard">Ir para Dashboard</Link>
+              <Link to={redirectTo}>Voltar</Link>
             </Button>
           </CardContent>
         </Card>

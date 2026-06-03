@@ -2,9 +2,15 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { Outlet } from "react-router-dom";
+import { ChatProvider } from "@/features/chat/chat-context";
+import { AgentesProvider } from "@/features/agentes-ia/agentes-context";
+import { TenantUsersProvider } from "@/features/auth/tenant-users-context";
 
 export default function DashboardLayout() {
   return (
+    <AgentesProvider>
+    <TenantUsersProvider>
+    <ChatProvider>
     <SidebarProvider>
       <div className="flex min-h-screen w-full">
         <AppSidebar />
@@ -16,5 +22,8 @@ export default function DashboardLayout() {
         </div>
       </div>
     </SidebarProvider>
+    </ChatProvider>
+    </TenantUsersProvider>
+    </AgentesProvider>
   );
 }

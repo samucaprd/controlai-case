@@ -1,3 +1,4 @@
+import { Link, useNavigate } from "react-router-dom";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -10,24 +11,21 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { LogOut, Settings, User } from "lucide-react";
-import { useAuth } from "@/features/auth/auth-context";
-import { useNavigate } from "react-router-dom";
+import { useSession } from "@/features/auth/session-context";
 
 export function AppHeader() {
-  const { perfil, empresa, signOut } = useAuth();
   const navigate = useNavigate();
-
-  const initials =
-    perfil?.nome_completo
-      ?.split(" ")
-      .map((n) => n[0])
-      .join("")
-      .slice(0, 2)
-      .toUpperCase() ?? "U";
+  const { user, signOut, canManageTenant } = useSession();
+  const initials = user.nome
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 
   const handleSignOut = async () => {
     await signOut();
-    navigate("/auth/login");
+    navigate("/auth/login", { replace: true });
   };
 
   return (
@@ -35,13 +33,7 @@ export function AppHeader() {
       <div className="flex h-full items-center gap-4 px-4">
         <SidebarTrigger />
 
-        <div className="flex-1">
-          {empresa?.nome && (
-            <p className="text-sm text-muted-foreground truncate">
-              {empresa.nome}
-            </p>
-          )}
-        </div>
+        <div className="flex-1" />
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -55,16 +47,21 @@ export function AppHeader() {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel>
-              {perfil?.nome_completo ?? perfil?.email ?? "Minha Conta"}
+              {user.nome}
+              <p className="text-xs font-normal text-muted-foreground">{user.email}</p>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
+            {canManageTenant && (
+              <DropdownMenuItem asChild>
+                <Link to="/dashboard/admin">
+                  <Settings className="mr-2 h-4 w-4" />
+                  Configurações
+                </Link>
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem>
               <User className="mr-2 h-4 w-4" />
-              Perfil
-            </DropdownMenuItem>
-            <DropdownMenuItem>
-              <Settings className="mr-2 h-4 w-4" />
-              Configurações
+              Perfil ({user.role})
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem

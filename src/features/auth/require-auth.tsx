@@ -1,21 +1,37 @@
-import { Navigate, Outlet, useLocation } from "react-router-dom";
-import { useAuth } from "./auth-context";
+import { useEffect, type ReactNode } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { useSession } from "./session-context";
 
-export function RequireAuth() {
-  const { session, isLoading } = useAuth();
+interface RequireAuthProps {
+  children: ReactNode;
+}
+
+export function RequireAuth({ children }: RequireAuthProps) {
+  const navigate = useNavigate();
   const location = useLocation();
+  const { isAuthenticated, isLoading, isSupabaseMode } = useSession();
 
-  if (isLoading) {
+  useEffect(() => {
+    if (isSupabaseMode && isLoading) return;
+    if (!isAuthenticated) {
+      navigate("/auth/login", {
+        replace: true,
+        state: { from: location.pathname },
+      });
+    }
+  }, [isAuthenticated, isLoading, isSupabaseMode, navigate, location.pathname]);
+
+  if (isSupabaseMode && isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <p className="text-muted-foreground">Carregando sessão...</p>
+        <p className="text-muted-foreground">Carregando sessão…</p>
       </div>
     );
   }
 
-  if (!session) {
-    return <Navigate to="/auth/login" state={{ from: location }} replace />;
+  if (!isAuthenticated) {
+    return null;
   }
 
-  return <Outlet />;
+  return <>{children}</>;
 }
