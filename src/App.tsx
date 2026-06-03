@@ -12,7 +12,6 @@ import Dashboard from "./pages/Dashboard";
 import Colaborador from "./pages/dashboard/Colaborador";
 import AgentesIA from "./pages/dashboard/AgentesIA";
 import Admin from "./pages/dashboard/Admin";
-import AdminColaboradores from "./pages/dashboard/AdminColaboradores";
 import Master from "./pages/dashboard/Master";
 import NotFound from "./pages/NotFound";
 import { SessionProvider } from "@/features/auth/session-context";

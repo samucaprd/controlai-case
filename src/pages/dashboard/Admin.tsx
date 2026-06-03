@@ -16,12 +16,6 @@ function AdminContent() {
         <p className="text-muted-foreground mt-2">
           Gerencie colaboradores, assinatura e integrações do seu tenant
         </p>
-        <Button variant="link" className="mt-2 h-auto p-0" asChild>
-          <Link to="/dashboard/admin/colaboradores">
-            <Users className="mr-2 h-4 w-4 inline" />
-            Gerenciar colaboradores
-          </Link>
-        </Button>
       </div>
 
       <Tabs defaultValue="usuarios" className="space-y-6">
