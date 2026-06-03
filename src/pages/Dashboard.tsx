@@ -1,6 +1,8 @@
+import { Navigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Users, MessageSquare, TrendingUp, Activity } from "lucide-react";
+import { useSession } from "@/features/auth/session-context";
 
 const stats = [
   {
@@ -34,6 +36,12 @@ const stats = [
 ];
 
 export default function Dashboard() {
+  const { isColaborador } = useSession();
+
+  if (isColaborador) {
+    return <Navigate to="/dashboard/colaborador" replace />;
+  }
+
   return (
     <div className="space-y-8">
       <div>

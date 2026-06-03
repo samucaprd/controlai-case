@@ -13,11 +13,13 @@ import AgentesIA from "./pages/dashboard/AgentesIA";
 import Admin from "./pages/dashboard/Admin";
 import Master from "./pages/dashboard/Master";
 import NotFound from "./pages/NotFound";
+import { SessionProvider } from "@/features/auth/session-context";
 
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
+    <SessionProvider>
     <TooltipProvider>
       <Toaster />
       <Sonner />
@@ -40,6 +42,7 @@ const App = () => (
         </Routes>
       </BrowserRouter>
     </TooltipProvider>
+    </SessionProvider>
   </QueryClientProvider>
 );
 

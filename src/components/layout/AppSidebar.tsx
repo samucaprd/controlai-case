@@ -1,4 +1,11 @@
-import { Home, MessageSquare, Settings, BarChart3, Bot } from "lucide-react";
+import {
+  Home,
+  MessageSquare,
+  Settings,
+  BarChart3,
+  Bot,
+  type LucideIcon,
+} from "lucide-react";
 import { NavLink } from "react-router-dom";
 import {
   Sidebar,
@@ -12,18 +19,57 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { ChatHistorySidebar } from "@/components/layout/ChatHistorySidebar";
+import { useSession } from "@/features/auth/session-context";
+import type { AppRole } from "@/features/auth/types";
 
-const menuItems = [
-  { title: "Dashboard", url: "/dashboard", icon: Home },
-  { title: "Chats", url: "/dashboard/colaborador", icon: MessageSquare },
-  { title: "Agentes IA", url: "/dashboard/agentes-ia", icon: Bot },
-  { title: "Configurações", url: "/dashboard/admin", icon: Settings },
-  { title: "Administração", url: "/dashboard/master", icon: BarChart3 },
+interface MenuItem {
+  title: string;
+  url: string;
+  icon: LucideIcon;
+  roles: AppRole[];
+}
+
+const allMenuItems: MenuItem[] = [
+  {
+    title: "Dashboard",
+    url: "/dashboard",
+    icon: Home,
+    roles: ["admin", "master"],
+  },
+  {
+    title: "Chats",
+    url: "/dashboard/colaborador",
+    icon: MessageSquare,
+    roles: ["admin", "master", "user"],
+  },
+  {
+    title: "Agentes IA",
+    url: "/dashboard/agentes-ia",
+    icon: Bot,
+    roles: ["admin", "master"],
+  },
+  {
+    title: "Configurações",
+    url: "/dashboard/admin",
+    icon: Settings,
+    roles: ["admin", "master"],
+  },
+  {
+    title: "Administração",
+    url: "/dashboard/master",
+    icon: BarChart3,
+    roles: ["master"],
+  },
 ];
 
 export function AppSidebar() {
   const { state } = useSidebar();
+  const { user } = useSession();
   const isCollapsed = state === "collapsed";
+
+  const menuItems = allMenuItems.filter((item) =>
+    item.roles.includes(user.role),
+  );
 
   return (
     <Sidebar collapsible="icon">
@@ -50,6 +96,7 @@ export function AppSidebar() {
                   <SidebarMenuButton asChild>
                     <NavLink
                       to={item.url}
+                      end={item.url === "/dashboard"}
                       className={({ isActive }) =>
                         isActive
                           ? "bg-sidebar-accent text-sidebar-primary"

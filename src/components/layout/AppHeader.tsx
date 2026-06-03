@@ -1,3 +1,4 @@
+import { Link, useNavigate } from "react-router-dom";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -10,10 +11,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { LogOut, Settings, User } from "lucide-react";
-import { useChat } from "@/features/chat/chat-context";
+import { useSession } from "@/features/auth/session-context";
 
 export function AppHeader() {
-  const { user } = useChat();
+  const navigate = useNavigate();
+  const { user, signOut, canManageTenant } = useSession();
   const initials = user.nome
     .split(" ")
     .map((n) => n[0])
@@ -21,13 +23,18 @@ export function AppHeader() {
     .slice(0, 2)
     .toUpperCase();
 
+  const handleSignOut = () => {
+    void signOut();
+    navigate("/auth/login");
+  };
+
   return (
     <header className="sticky top-0 z-50 h-16 border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60">
       <div className="flex h-full items-center gap-4 px-4">
         <SidebarTrigger />
-        
+
         <div className="flex-1" />
-        
+
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="relative h-10 w-10 rounded-full">
@@ -39,18 +46,25 @@ export function AppHeader() {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuLabel>Minha Conta</DropdownMenuLabel>
+            <DropdownMenuLabel>
+              {user.nome}
+              <p className="text-xs font-normal text-muted-foreground">{user.email}</p>
+            </DropdownMenuLabel>
             <DropdownMenuSeparator />
+            {canManageTenant && (
+              <DropdownMenuItem asChild>
+                <Link to="/dashboard/admin">
+                  <Settings className="mr-2 h-4 w-4" />
+                  Configurações
+                </Link>
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem>
               <User className="mr-2 h-4 w-4" />
-              Perfil
-            </DropdownMenuItem>
-            <DropdownMenuItem>
-              <Settings className="mr-2 h-4 w-4" />
-              Configurações
+              Perfil ({user.role})
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive">
+            <DropdownMenuItem className="text-destructive" onClick={handleSignOut}>
               <LogOut className="mr-2 h-4 w-4" />
               Sair
             </DropdownMenuItem>

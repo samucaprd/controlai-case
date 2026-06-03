@@ -24,5 +24,3 @@ export interface ChatContextValue {
   setSelectedAgenteId: (id: string | null) => void;
   setSelectedConversaId: (id: string | null) => void;
 }
-
-export const CHAT_USER_STORAGE_KEY = "controlia_chat_user";

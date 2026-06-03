@@ -4,10 +4,12 @@ import { AppHeader } from "@/components/layout/AppHeader";
 import { Outlet } from "react-router-dom";
 import { ChatProvider } from "@/features/chat/chat-context";
 import { AgentesProvider } from "@/features/agentes-ia/agentes-context";
+import { TenantUsersProvider } from "@/features/auth/tenant-users-context";
 
 export default function DashboardLayout() {
   return (
     <AgentesProvider>
+    <TenantUsersProvider>
     <ChatProvider>
     <SidebarProvider>
       <div className="flex min-h-screen w-full">
@@ -21,6 +23,7 @@ export default function DashboardLayout() {
       </div>
     </SidebarProvider>
     </ChatProvider>
+    </TenantUsersProvider>
     </AgentesProvider>
   );
 }

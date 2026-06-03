@@ -7,31 +7,23 @@ import {
   type ReactNode,
 } from "react";
 import { useAgentes } from "@/features/agentes-ia/agentes-context";
+import { useSession } from "@/features/auth/session-context";
 import { mockConversas } from "./mock-conversas";
 import type { ChatContextValue, ChatUser } from "./types";
-import { CHAT_USER_STORAGE_KEY } from "./types";
-
-const defaultUser: ChatUser = {
-  id: "user-demo",
-  nome: "Usuário",
-  empresaNome: "Sua Empresa",
-};
-
-function loadUser(): ChatUser {
-  try {
-    const raw = localStorage.getItem(CHAT_USER_STORAGE_KEY);
-    if (!raw) return defaultUser;
-    return { ...defaultUser, ...JSON.parse(raw) } as ChatUser;
-  } catch {
-    return defaultUser;
-  }
-}
 
 const ChatContext = createContext<ChatContextValue | undefined>(undefined);
 
 export function ChatProvider({ children }: { children: ReactNode }) {
   const { agentesAtivos, agentesPopulares } = useAgentes();
-  const [user] = useState<ChatUser>(loadUser);
+  const { user: session } = useSession();
+  const user: ChatUser = useMemo(
+    () => ({
+      id: session.id,
+      nome: session.nome,
+      empresaNome: session.empresaNome,
+    }),
+    [session.id, session.nome, session.empresaNome],
+  );
   const [selectedAgenteId, setSelectedAgenteId] = useState<string | null>(null);
   const [selectedConversaId, setSelectedConversaId] = useState<string | null>(null);
 
@@ -84,6 +76,3 @@ export function useChat() {
   return ctx;
 }
 
-export function persistChatUser(user: ChatUser) {
-  localStorage.setItem(CHAT_USER_STORAGE_KEY, JSON.stringify(user));
-}

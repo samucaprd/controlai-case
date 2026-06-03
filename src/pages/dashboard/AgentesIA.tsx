@@ -5,9 +5,10 @@ import { AgenteIACard } from "@/components/agentes-ia/agente-ia-card";
 import { AgentesIAStats } from "@/components/agentes-ia/agentes-ia-stats";
 import { AgenteFormDialog } from "@/components/agentes-ia/agente-form-dialog";
 import { useAgentes } from "@/features/agentes-ia/agentes-context";
+import { RoleGate } from "@/features/auth/role-gate";
 import type { AgenteFormMode, AgenteIA } from "@/components/agentes-ia/types";
 
-export default function AgentesIA() {
+function AgentesIAContent() {
   const { agentes } = useAgentes();
   const [formOpen, setFormOpen] = useState(false);
   const [formMode, setFormMode] = useState<AgenteFormMode>("create");
@@ -59,5 +60,13 @@ export default function AgentesIA() {
         ))}
       </div>
     </div>
+  );
+}
+
+export default function AgentesIA() {
+  return (
+    <RoleGate allowed={["admin", "master"]} redirectTo="/dashboard/colaborador">
+      <AgentesIAContent />
+    </RoleGate>
   );
 }

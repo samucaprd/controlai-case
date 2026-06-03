@@ -1,3 +1,4 @@
+import { RoleGate } from "@/features/auth/role-gate";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -62,7 +63,7 @@ const platformStats = [
   }
 ];
 
-export default function Master() {
+function MasterContent() {
   return (
     <div className="space-y-8">
       <div>
@@ -285,5 +286,13 @@ export default function Master() {
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+export default function Master() {
+  return (
+    <RoleGate allowed={["master"]} redirectTo="/dashboard/colaborador">
+      <MasterContent />
+    </RoleGate>
   );
 }
