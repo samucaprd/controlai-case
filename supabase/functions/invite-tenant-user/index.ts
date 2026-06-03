@@ -108,35 +108,20 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { data: existingAuth, error: authLookupError } =
-      await adminClient.auth.admin.getUserByEmail(email);
-
-    if (authLookupError && authLookupError.message !== "User not found") {
-      return jsonResponse({ error: authLookupError.message }, 500);
-    }
-
-    if (existingAuth?.user) {
-      return jsonResponse(
-        {
-          error: "Este e-mail já possui conta no sistema.",
-          code: "EMAIL_EXISTS",
-        },
-        409,
-      );
-    }
-
     const siteUrl =
-      Deno.env.get("SITE_URL") ?? Deno.env.get("VITE_SITE_URL") ?? "http://localhost:3000";
+      Deno.env.get("SITE_URL") ??
+      Deno.env.get("VITE_SITE_URL") ??
+      "http://localhost:3000";
 
     const { data: inviteData, error: inviteError } =
       await adminClient.auth.admin.inviteUserByEmail(email, {
         data: {
           invited: true,
-          empresa_id: callerPerfil.empresa_id,
+          empresa_id: String(callerPerfil.empresa_id),
           role,
           nome_completo: nomeCompleto,
         },
-        redirectTo: `${siteUrl}/auth/login`,
+        redirectTo: `${siteUrl}/auth/accept-invite`,
       });
 
     if (inviteError) {
@@ -144,11 +129,12 @@ Deno.serve(async (req: Request) => {
       if (
         message.includes("already") ||
         message.includes("registered") ||
-        message.includes("exists")
+        message.includes("exists") ||
+        message.includes("duplicate")
       ) {
         return jsonResponse(
           {
-            error: "Este e-mail já está cadastrado.",
+            error: "Este e-mail já possui conta no sistema.",
             code: "EMAIL_EXISTS",
           },
           409,
@@ -164,6 +150,7 @@ Deno.serve(async (req: Request) => {
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
+    console.error("invite-tenant-user error:", message);
     return jsonResponse({ error: message }, 500);
   }
 });

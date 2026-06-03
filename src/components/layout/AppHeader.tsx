@@ -23,9 +23,9 @@ export function AppHeader() {
     .slice(0, 2)
     .toUpperCase();
 
-  const handleSignOut = () => {
-    void signOut();
-    navigate("/auth/login");
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/auth/login", { replace: true });
   };
 
   return (
@@ -64,7 +64,10 @@ export function AppHeader() {
               Perfil ({user.role})
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive" onClick={handleSignOut}>
+            <DropdownMenuItem
+              className="text-destructive"
+              onClick={() => void handleSignOut()}
+            >
               <LogOut className="mr-2 h-4 w-4" />
               Sair
             </DropdownMenuItem>

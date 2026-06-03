@@ -21,7 +21,9 @@ import type { TenantUser } from "@/features/auth/mock-tenant-users";
 import { useSession } from "@/features/auth/session-context";
 import type { AppRole } from "@/features/auth/types";
 import { UsuarioFormDialog } from "@/components/admin/usuario-form-dialog";
+import { UsuarioDeleteDialog } from "@/components/admin/usuario-delete-dialog";
 import { toast } from "sonner";
+import { DeleteUserError } from "@/lib/api/delete-tenant-user";
 import { InviteUserError } from "@/lib/api/invite-tenant-user";
 import { isSupabaseConfigured } from "@/lib/supabase/is-configured";
 
@@ -36,11 +38,14 @@ function initials(nome: string) {
 
 export function AdminUsuariosTab() {
   const { user: sessionUser } = useSession();
-  const { users, isLoading, updateUser, addUser, saveUser } = useTenantUsers();
+  const { users, isLoading, updateUser, addUser, saveUser, removeUser } =
+    useTenantUsers();
   const useSupabase = isSupabaseConfigured();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<TenantUserFormMode>("create");
   const [editingUser, setEditingUser] = useState<TenantUser | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletingUser, setDeletingUser] = useState<TenantUser | null>(null);
 
   const openCreate = () => {
     setDialogMode("create");
@@ -52,6 +57,43 @@ export function AdminUsuariosTab() {
     setDialogMode("edit");
     setEditingUser(u);
     setDialogOpen(true);
+  };
+
+  const openDelete = (u: TenantUser) => {
+    setDeletingUser(u);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async ({
+    motivo,
+    notifyByEmail,
+  }: {
+    motivo: string;
+    notifyByEmail: boolean;
+  }) => {
+    if (!deletingUser) return;
+
+    try {
+      const result = await removeUser(deletingUser.id, {
+        motivo,
+        notifyByEmail,
+      });
+      toast.success("Usuário excluído.");
+      if (notifyByEmail) {
+        if (result.email_sent) {
+          toast.success("E-mail de aviso enviado ao usuário.");
+        } else if (result.email_warning) {
+          toast.warning(result.email_warning);
+        }
+      }
+    } catch (err) {
+      const message =
+        err instanceof DeleteUserError || err instanceof Error
+          ? err.message
+          : "Erro ao excluir usuário.";
+      toast.error(message);
+      throw err;
+    }
   };
 
   const handleDialogSave = async (data: {
@@ -212,7 +254,7 @@ export function AdminUsuariosTab() {
                       className="h-9 w-9 border-border text-destructive hover:text-destructive"
                       disabled={isSelf || isMasterUser}
                       aria-label={`Excluir ${u.nome}`}
-                      onClick={() => toast.message("Exclusão em breve.")}
+                      onClick={() => openDelete(u)}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -230,6 +272,13 @@ export function AdminUsuariosTab() {
         mode={dialogMode}
         usuario={editingUser}
         onSave={handleDialogSave}
+      />
+
+      <UsuarioDeleteDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        usuario={deletingUser}
+        onConfirm={handleDeleteConfirm}
       />
     </>
   );
