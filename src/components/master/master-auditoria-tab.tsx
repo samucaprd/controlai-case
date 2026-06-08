@@ -33,6 +33,9 @@ function acaoLabel(acao: string): string {
     usuario_convidado: "Usuário convidado",
     usuario_atualizado: "Usuário atualizado",
     usuario_excluido: "Usuário excluído",
+    byok_cadastrada: "BYOK cadastrada",
+    byok_rotacionada: "BYOK rotacionada",
+    byok_removida: "BYOK removida",
   };
   return labels[acao] ?? acao;
 }

@@ -7,7 +7,7 @@ import { AdminByokTab } from "@/components/admin/admin-byok-tab";
 import { useTenantSubscription } from "@/features/admin/use-tenant-subscription";
 
 function AdminContent() {
-  const { info, isLoading } = useTenantSubscription();
+  const { info, isLoading, refresh } = useTenantSubscription();
 
   return (
     <div className="space-y-8">
@@ -43,7 +43,7 @@ function AdminContent() {
         </TabsContent>
 
         <TabsContent value="api">
-          <AdminByokTab info={info} isLoading={isLoading} />
+          <AdminByokTab info={info} isLoading={isLoading} onRefresh={refresh} />
         </TabsContent>
       </Tabs>
     </div>

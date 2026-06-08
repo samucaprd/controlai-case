@@ -27,3 +27,12 @@ export function getSupabase(): SupabaseClient<Database> {
 
   return client;
 }
+
+/** Proxy para compatibilidade com imports legados (`import { supabase }`). */
+export const supabase = new Proxy({} as SupabaseClient<Database>, {
+  get(_target, prop) {
+    const instance = getSupabase();
+    const value = instance[prop as keyof SupabaseClient<Database>];
+    return typeof value === "function" ? value.bind(instance) : value;
+  },
+});
