@@ -2,93 +2,105 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
 } from "react";
-import { mockAgentesIA } from "@/components/agentes-ia/mock-agentes";
 import type { AgenteIA } from "@/components/agentes-ia/types";
-
-const AGENTES_OVERRIDES_KEY = "controlia_agentes_overrides";
-
-type AgenteOverrides = Record<
-  string,
-  { is_active?: boolean; is_popular?: boolean }
->;
-
-function loadOverrides(): AgenteOverrides {
-  try {
-    const raw = localStorage.getItem(AGENTES_OVERRIDES_KEY);
-    if (!raw) return {};
-    return JSON.parse(raw) as AgenteOverrides;
-  } catch {
-    return {};
-  }
-}
-
-function applyOverrides(agentes: AgenteIA[], overrides: AgenteOverrides): AgenteIA[] {
-  return agentes.map((agente) => {
-    const patch = overrides[agente.id];
-    if (!patch) return agente;
-    const is_active = patch.is_active ?? agente.is_active;
-    const is_popular =
-      patch.is_popular !== undefined
-        ? patch.is_popular && is_active
-        : agente.is_popular && is_active;
-    return { ...agente, is_active, is_popular };
-  });
-}
-
-function mergeAgentes(): AgenteIA[] {
-  return applyOverrides(mockAgentesIA, loadOverrides());
-}
+import {
+  createAgenteIa,
+  deleteAgenteIa,
+  listAgentesIa,
+  updateAgenteIa,
+  type AgenteIaPayload,
+} from "@/lib/api/agentes-ia";
+import { isSupabaseConfigured } from "@/lib/supabase/is-configured";
+import { useSession } from "@/features/auth/session-context";
+import { useTenantSubscription } from "@/features/admin/use-tenant-subscription";
 
 interface AgentesContextValue {
   agentes: AgenteIA[];
   agentesAtivos: AgenteIA[];
   agentesPopulares: AgenteIA[];
+  isLoading: boolean;
+  maxAgentes: number;
+  canCreateMore: boolean;
+  refresh: () => Promise<void>;
+  createAgente: (payload: AgenteIaPayload) => Promise<AgenteIA>;
   updateAgente: (
     id: string,
-    patch: Partial<Pick<AgenteIA, "is_active" | "is_popular">>,
-  ) => void;
+    patch: Partial<AgenteIaPayload>,
+  ) => Promise<void>;
+  deleteAgente: (id: string) => Promise<void>;
 }
 
 const AgentesContext = createContext<AgentesContextValue | undefined>(undefined);
 
 export function AgentesProvider({ children }: { children: ReactNode }) {
-  const [agentes, setAgentes] = useState<AgenteIA[]>(mergeAgentes);
+  const { user } = useSession();
+  const useSupabase = isSupabaseConfigured();
+  const { info } = useTenantSubscription();
+  const [agentes, setAgentes] = useState<AgenteIA[]>([]);
+  const [isLoading, setIsLoading] = useState(useSupabase);
 
-  const persist = useCallback((next: AgenteIA[]) => {
-    const overrides: AgenteOverrides = {};
-    for (const a of next) {
-      const base = mockAgentesIA.find((m) => m.id === a.id);
-      if (!base) continue;
-      if (a.is_active !== base.is_active || a.is_popular !== base.is_popular) {
-        overrides[a.id] = {
-          is_active: a.is_active,
-          is_popular: a.is_popular,
-        };
-      }
+  const maxAgentes = info?.maxAgentes ?? 0;
+  const canCreateMore = agentes.length < maxAgentes;
+
+  const fetchAgentes = useCallback(async () => {
+    if (!useSupabase || !user?.empresaId) {
+      setAgentes([]);
+      setIsLoading(false);
+      return;
     }
-    localStorage.setItem(AGENTES_OVERRIDES_KEY, JSON.stringify(overrides));
-  }, []);
+
+    setIsLoading(true);
+    try {
+      const rows = await listAgentesIa(Number(user.empresaId));
+      setAgentes(rows);
+    } catch (err) {
+      console.error("[agentes]", err);
+      setAgentes([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [useSupabase, user?.empresaId]);
+
+  useEffect(() => {
+    void fetchAgentes();
+  }, [fetchAgentes]);
+
+  const createAgente = useCallback(
+    async (payload: AgenteIaPayload) => {
+      if (!user?.empresaId) throw new Error("Empresa não identificada.");
+      if (agentes.length >= maxAgentes) {
+        throw new Error(
+          `Limite do plano atingido: máximo ${maxAgentes} agente(s).`,
+        );
+      }
+      const created = await createAgenteIa(
+        Number(user.empresaId),
+        payload,
+        user.id,
+      );
+      setAgentes((prev) => [created, ...prev]);
+      return created;
+    },
+    [agentes.length, maxAgentes, user?.empresaId, user?.id],
+  );
 
   const updateAgente = useCallback(
-    (id: string, patch: Partial<Pick<AgenteIA, "is_active" | "is_popular">>) => {
-      setAgentes((prev) => {
-        const next = prev.map((agente) => {
-          if (agente.id !== id) return agente;
-          const is_active = patch.is_active ?? agente.is_active;
-          let is_popular = patch.is_popular ?? agente.is_popular;
-          if (!is_active) is_popular = false;
-          return { ...agente, is_active, is_popular };
-        });
-        persist(next);
-        return next;
-      });
+    async (id: string, patch: Partial<AgenteIaPayload>) => {
+      const updated = await updateAgenteIa(id, patch);
+      setAgentes((prev) => prev.map((a) => (a.id === id ? updated : a)));
     },
-    [persist],
+    [],
   );
+
+  const deleteAgente = useCallback(async (id: string) => {
+    await deleteAgenteIa(id);
+    setAgentes((prev) => prev.filter((a) => a.id !== id));
+  }, []);
 
   const agentesAtivos = useMemo(
     () => agentes.filter((a) => a.is_active),
@@ -105,9 +117,26 @@ export function AgentesProvider({ children }: { children: ReactNode }) {
       agentes,
       agentesAtivos,
       agentesPopulares,
+      isLoading,
+      maxAgentes,
+      canCreateMore,
+      refresh: fetchAgentes,
+      createAgente,
       updateAgente,
+      deleteAgente,
     }),
-    [agentes, agentesAtivos, agentesPopulares, updateAgente],
+    [
+      agentes,
+      agentesAtivos,
+      agentesPopulares,
+      isLoading,
+      maxAgentes,
+      canCreateMore,
+      fetchAgentes,
+      createAgente,
+      updateAgente,
+      deleteAgente,
+    ],
   );
 
   return (

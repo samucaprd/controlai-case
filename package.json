@@ -10,7 +10,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "smoke:supabase": "node scripts/smoke-supabase.mjs",
-    "smoke:byok": "node scripts/smoke-byok.mjs"
+    "smoke:byok": "node scripts/smoke-byok.mjs",
+    "smoke:agentes": "node scripts/smoke-agentes.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

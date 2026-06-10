@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -13,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { useAgentes } from "@/features/agentes-ia/agentes-context";
 import { AGENTE_COR_OPTIONS, AGENTE_ICON_OPTIONS } from "./constants";
 import type { AgenteFormMode, AgenteIA } from "./types";
 import { toast } from "sonner";
@@ -40,6 +42,7 @@ export function AgenteFormDialog({
   mode,
   agente,
 }: AgenteFormDialogProps) {
+  const { createAgente, updateAgente } = useAgentes();
   const [nome, setNome] = useState(emptyForm.nome);
   const [descricao, setDescricao] = useState(emptyForm.descricao);
   const [instrucoes, setInstrucoes] = useState(emptyForm.instrucoes);
@@ -47,6 +50,7 @@ export function AgenteFormDialog({
   const [corId, setCorId] = useState(emptyForm.corId);
   const [isActive, setIsActive] = useState(emptyForm.isActive);
   const [isPopular, setIsPopular] = useState(emptyForm.isPopular);
+  const [busy, setBusy] = useState(false);
 
   const isEdit = mode === "edit";
 
@@ -75,22 +79,43 @@ export function AgenteFormDialog({
   const corSelecionada = AGENTE_COR_OPTIONS.find((c) => c.id === corId)!;
   const PreviewIcon = iconeSelecionado.icon;
 
-  const handleOpenChange = (next: boolean) => {
-    onOpenChange(next);
-  };
+  const buildPayload = () => ({
+    nome,
+    descricao,
+    instrucoes,
+    iconeId,
+    corId,
+    is_active: isActive,
+    is_popular: isPopular,
+  });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast.success(
-      isEdit
-        ? "Alterações salvas (layout) — integração com banco na próxima etapa."
-        : "Agente cadastrado (layout) — integração com banco na próxima etapa.",
-    );
-    onOpenChange(false);
+    if (!nome.trim()) {
+      toast.error("Informe o nome do agente.");
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const payload = buildPayload();
+      if (isEdit && agente) {
+        await updateAgente(agente.id, payload);
+        toast.success("Agente atualizado com sucesso.");
+      } else {
+        await createAgente(payload);
+        toast.success("Agente cadastrado com sucesso.");
+      }
+      onOpenChange(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erro ao salvar agente.");
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[90vh] max-w-2xl flex-col gap-0 overflow-hidden border-border p-0 sm:max-h-[90vh]">
         <DialogHeader className="shrink-0 space-y-1 border-b border-border px-6 py-5 pr-12">
           <DialogTitle>{isEdit ? "Editar Agente IA" : "Novo Agente IA"}</DialogTitle>
@@ -102,7 +127,7 @@ export function AgenteFormDialog({
         </DialogHeader>
 
         <form
-          onSubmit={handleSubmit}
+          onSubmit={(e) => void handleSubmit(e)}
           className="flex min-h-0 flex-1 flex-col overflow-hidden"
         >
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
@@ -133,6 +158,7 @@ export function AgenteFormDialog({
                   value={nome}
                   onChange={(e) => setNome(e.target.value)}
                   className="border-border bg-input"
+                  required
                 />
               </div>
 
@@ -192,8 +218,8 @@ export function AgenteFormDialog({
                           "h-9 w-9 rounded-full ring-offset-background transition-all",
                           opt.classe,
                           selected
-                            ? "ring-2 ring-primary ring-offset-2"
-                            : "opacity-80 hover:opacity-100",
+                              ? "ring-2 ring-primary ring-offset-2"
+                              : "opacity-80 hover:opacity-100",
                         )}
                         aria-label={opt.label}
                       />
@@ -253,13 +279,16 @@ export function AgenteFormDialog({
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
+              disabled={busy}
             >
               Cancelar
             </Button>
             <Button
               type="submit"
               className="bg-primary text-primary-foreground hover:bg-primary/90"
+              disabled={busy}
             >
+              {busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
               {isEdit ? "Salvar alterações" : "Salvar agente"}
             </Button>
           </DialogFooter>
