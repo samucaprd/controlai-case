@@ -26,6 +26,8 @@ import { toast } from "sonner";
 import { DeleteUserError } from "@/lib/api/delete-tenant-user";
 import { InviteUserError } from "@/lib/api/invite-tenant-user";
 import { isSupabaseConfigured } from "@/lib/supabase/is-configured";
+import { useTenantUsage } from "@/features/admin/use-tenant-usage";
+import { useTenantSubscription } from "@/features/admin/use-tenant-subscription";
 
 function initials(nome: string) {
   return nome
@@ -41,6 +43,14 @@ export function AdminUsuariosTab() {
   const { users, isLoading, updateUser, addUser, saveUser, removeUser } =
     useTenantUsers();
   const useSupabase = isSupabaseConfigured();
+  const { usage } = useTenantUsage();
+  const { info: subscriptionInfo } = useTenantSubscription();
+
+  const maxUsuarios =
+    usage?.limites.max_usuarios ?? subscriptionInfo?.maxUsuarios ?? 0;
+  const usuariosAtivos =
+    usage?.usuarios_ativos ?? users.filter((u) => u.status === "ativo").length;
+  const atUserLimit = maxUsuarios > 0 && usuariosAtivos >= maxUsuarios;
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<TenantUserFormMode>("create");
   const [editingUser, setEditingUser] = useState<TenantUser | null>(null);
@@ -136,20 +146,34 @@ export function AdminUsuariosTab() {
           <div>
             <CardTitle>Gerenciar Usuários</CardTitle>
             <CardDescription>
-              Colaboradores da empresa {sessionUser.empresaNome} — apenas do seu
-              tenant
+              Colaboradores da empresa {sessionUser.empresaNome} —{" "}
+              {maxUsuarios > 0
+                ? `${usuariosAtivos}/${maxUsuarios} usuários do plano`
+                : "apenas do seu tenant"}
             </CardDescription>
           </div>
           <Button
             type="button"
             className="shrink-0 bg-primary text-primary-foreground hover:bg-primary/90"
             onClick={openCreate}
+            disabled={atUserLimit}
+            title={
+              atUserLimit
+                ? `Limite de ${maxUsuarios} usuários atingido`
+                : undefined
+            }
           >
             <Plus className="mr-2 h-4 w-4" />
             Adicionar Usuário
           </Button>
         </CardHeader>
         <CardContent className="space-y-3">
+          {atUserLimit && (
+            <p className="text-sm text-amber-500/90 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2">
+              Limite de usuários do plano atingido. Faça upgrade na aba
+              Assinatura para convidar mais colaboradores.
+            </p>
+          )}
           {isLoading && (
             <p className="text-sm text-muted-foreground py-8 text-center">
               Carregando usuários…

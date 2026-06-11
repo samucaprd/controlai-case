@@ -7,6 +7,7 @@ import Landing from "./pages/Landing";
 import Login from "./pages/auth/Login";
 import AcceptInvite from "./pages/auth/AcceptInvite";
 import Register from "./pages/auth/Register";
+import ResetPassword from "./pages/auth/reset-password";
 import DashboardLayout from "./pages/dashboard/DashboardLayout";
 import Dashboard from "./pages/Dashboard";
 import Colaborador from "./pages/dashboard/Colaborador";
@@ -31,6 +32,7 @@ const App = () => (
           <Route path="/auth/login" element={<Login />} />
           <Route path="/auth/accept-invite" element={<AcceptInvite />} />
           <Route path="/auth/register" element={<Register />} />
+          <Route path="/auth/reset-password" element={<ResetPassword />} />
           
           <Route
             path="/dashboard"

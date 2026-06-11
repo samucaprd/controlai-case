@@ -30,6 +30,8 @@ import { mapPerfilToSessionUser } from "@/lib/supabase/map-session";
 
 import { mapAuthErrorMessage } from "@/features/auth/auth-errors";
 
+import { requestPasswordReset } from "@/lib/api/auth-email";
+
 import { toast } from "sonner";
 
 
@@ -168,25 +170,27 @@ export default function Login() {
 
     try {
 
-      const supabase = getSupabase();
+      const result = await requestPasswordReset(normalizedEmail);
 
-      const { error } = await supabase.auth.resetPasswordForEmail(
+      toast.success(result.message);
 
-        normalizedEmail,
+      if (result.email_warning) {
 
-        { redirectTo: `${window.location.origin}/auth/accept-invite?type=recovery` },
-
-      );
-
-      if (error) {
-
-        toast.error(mapAuthErrorMessage(error.message));
-
-        return;
+        toast.warning(result.email_warning);
 
       }
 
-      toast.success("Enviamos um link de redefinição de senha para seu e-mail.");
+    } catch (err) {
+
+      toast.error(
+
+        err instanceof Error
+
+          ? err.message
+
+          : "Não foi possível solicitar a recuperação de senha.",
+
+      );
 
     } finally {
 

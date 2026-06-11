@@ -1,23 +1,13 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-};
+import { sendBrevoEmail, getSiteUrl } from "../_shared/brevo.ts";
+import { userInviteEmail } from "../_shared/email-templates.ts";
+import { corsHeaders, jsonResponse } from "../_shared/cors.ts";
 
 interface InviteBody {
   email?: string;
   nome_completo?: string;
   role?: string;
-}
-
-function jsonResponse(body: Record<string, unknown>, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
 }
 
 function isValidEmail(email: string): boolean {
@@ -64,7 +54,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: callerPerfil, error: callerError } = await adminClient
       .from("perfis")
-      .select("id, empresa_id, role")
+      .select("id, empresa_id, role, nome_completo")
       .eq("id", user.id)
       .single();
 
@@ -108,24 +98,52 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const siteUrl =
-      Deno.env.get("SITE_URL") ??
-      Deno.env.get("VITE_SITE_URL") ??
-      "http://localhost:3000";
+    const { data: empresa } = await adminClient
+      .from("empresas")
+      .select("nome, plano_id")
+      .eq("id", callerPerfil.empresa_id)
+      .single();
 
-    const { data: inviteData, error: inviteError } =
-      await adminClient.auth.admin.inviteUserByEmail(email, {
-        data: {
+    const { data: plano } = await adminClient
+      .from("planos")
+      .select("max_usuarios")
+      .eq("id", empresa?.plano_id as number)
+      .single();
+
+    const maxUsuarios = Number(plano?.max_usuarios ?? 0);
+    const { count: userCount } = await adminClient
+      .from("perfis")
+      .select("id", { count: "exact", head: true })
+      .eq("empresa_id", callerPerfil.empresa_id)
+      .eq("status", "ativo");
+
+    if (maxUsuarios > 0 && (userCount ?? 0) >= maxUsuarios) {
+      return jsonResponse(
+        {
+          error: `Limite de usuários do plano atingido (máximo ${maxUsuarios}).`,
+          code: "USER_LIMIT_REACHED",
+        },
+        429,
+      );
+    }
+
+    const siteUrl = getSiteUrl();
+    const empresaNome = (empresa?.nome as string | undefined) ?? "sua empresa";
+
+    const { data: createdUser, error: createError } =
+      await adminClient.auth.admin.createUser({
+        email,
+        email_confirm: true,
+        user_metadata: {
           invited: true,
           empresa_id: String(callerPerfil.empresa_id),
           role,
           nome_completo: nomeCompleto,
         },
-        redirectTo: `${siteUrl}/auth/accept-invite`,
       });
 
-    if (inviteError) {
-      const message = inviteError.message.toLowerCase();
+    if (createError) {
+      const message = createError.message.toLowerCase();
       if (
         message.includes("already") ||
         message.includes("registered") ||
@@ -140,13 +158,54 @@ Deno.serve(async (req: Request) => {
           409,
         );
       }
-      return jsonResponse({ error: inviteError.message }, 400);
+      return jsonResponse({ error: createError.message }, 400);
+    }
+
+    const { data: linkData, error: linkError } =
+      await adminClient.auth.admin.generateLink({
+        type: "invite",
+        email,
+        options: {
+          redirectTo: `${siteUrl}/auth/accept-invite`,
+        },
+      });
+
+    if (linkError || !linkData?.properties?.action_link) {
+      if (createdUser.user?.id) {
+        await adminClient.auth.admin.deleteUser(createdUser.user.id);
+      }
+      return jsonResponse(
+        { error: linkError?.message ?? "Falha ao gerar link de convite" },
+        500,
+      );
+    }
+
+    const template = userInviteEmail({
+      nome: nomeCompleto,
+      empresaNome,
+      convidadoPor: callerPerfil.nome_completo?.trim() || undefined,
+      actionLink: linkData.properties.action_link,
+    });
+
+    const emailResult = await sendBrevoEmail({
+      toEmail: email,
+      toName: nomeCompleto,
+      subject: template.subject,
+      htmlContent: template.html,
+    });
+
+    if (!emailResult.sent) {
+      console.warn("Brevo invite email:", emailResult.warning);
     }
 
     return jsonResponse({
       success: true,
-      message: "Convite enviado por e-mail.",
-      user_id: inviteData.user?.id ?? null,
+      message: emailResult.sent
+        ? "Convite enviado por e-mail."
+        : "Usuário criado, mas o e-mail não foi enviado. Verifique os secrets Brevo.",
+      user_id: createdUser.user?.id ?? null,
+      email_sent: emailResult.sent,
+      email_warning: emailResult.warning ?? null,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
