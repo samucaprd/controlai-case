@@ -12,23 +12,105 @@ const COLORS = {
   border: "#333333",
 } as const;
 
-const LOGO_ICON =
-  "https://hrzsdiduafuqtxitpgoy.supabase.co/storage/v1/object/public/publico/icone.png";
-const LOGO_MINIATURA =
-  "https://hrzsdiduafuqtxitpgoy.supabase.co/storage/v1/object/public/publico/miniatura.png";
+const STORAGE_BASE =
+  "https://hrzsdiduafuqtxitpgoy.supabase.co/storage/v1/object/public/publico";
+
+/** Versões otimizadas para e-mail (~20–75 KB). O PNG original tem ~564 KB e muitos clientes bloqueiam. */
+const LOGO_ICON = `${STORAGE_BASE}/icone-email.png`;
+const LOGO_MINIATURA = `${STORAGE_BASE}/miniatura-email.png`;
 
 function ctaButton(label: string, href: string): string {
   return `
-    <table role="presentation" cellspacing="0" cellpadding="0" style="margin:28px auto 0;">
+    <table role="presentation" cellspacing="0" cellpadding="0" style="margin:32px auto 8px;">
       <tr>
-        <td style="border-radius:8px;background:linear-gradient(135deg,${COLORS.primary},${COLORS.accentBlue});">
+        <td align="center" style="border-radius:10px;background:linear-gradient(135deg,${COLORS.primary} 0%,${COLORS.accentBlue} 100%);">
           <a href="${href}" target="_blank" rel="noopener"
-             style="display:inline-block;padding:14px 32px;font-size:15px;font-weight:600;color:${COLORS.bgDark};text-decoration:none;border-radius:8px;">
+             style="display:inline-block;padding:15px 36px;font-size:15px;font-weight:600;color:${COLORS.bgDark};text-decoration:none;border-radius:10px;mso-padding-alt:0;">
             ${escapeHtml(label)}
           </a>
         </td>
       </tr>
     </table>`;
+}
+
+function emailHeaderBrand(useFullLogo?: boolean): string {
+  if (useFullLogo) {
+    return `
+          <tr>
+            <td style="padding:0;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                <tr>
+                  <td style="height:4px;background:linear-gradient(90deg,${COLORS.primary} 0%,${COLORS.accentBlue} 100%);font-size:0;line-height:0;">&nbsp;</td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding:36px 40px 28px;background-color:#111111;">
+              <img src="${LOGO_MINIATURA}" alt="ControlIA.io" width="240" border="0"
+                   style="display:block;margin:0 auto;border:0;outline:none;max-width:100%;" />
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 32px;font-size:0;line-height:0;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                <tr><td style="border-top:1px solid ${COLORS.border};">&nbsp;</td></tr>
+              </table>
+            </td>
+          </tr>`;
+  }
+
+  return `
+          <tr>
+            <td style="padding:0;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                <tr>
+                  <td style="height:4px;background:linear-gradient(90deg,${COLORS.primary} 0%,${COLORS.accentBlue} 100%);font-size:0;line-height:0;">&nbsp;</td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding:32px 32px 28px;background-color:#111111;">
+              <table role="presentation" cellspacing="0" cellpadding="0" style="margin:0 auto;">
+                <tr>
+                  <td align="center">
+                    <table role="presentation" cellspacing="0" cellpadding="0" style="margin:0 auto;">
+                      <tr>
+                        <td align="center" style="padding:16px 18px;background-color:#1c1c1c;border:1px solid #2a2a2a;border-radius:20px;">
+                          <table role="presentation" cellspacing="0" cellpadding="0">
+                            <tr>
+                              <td align="center" style="width:56px;height:56px;background-color:#0a0a0a;border-radius:14px;border:1px solid rgba(0,255,200,0.35);">
+                                <img src="${LOGO_ICON}" alt="" width="48" height="48" border="0"
+                                     style="display:block;margin:4px auto;border:0;outline:none;border-radius:10px;" />
+                              </td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+                <tr>
+                  <td align="center" style="padding-top:16px;">
+                    <p style="margin:0;font-size:22px;font-weight:700;color:${COLORS.text};letter-spacing:-0.4px;line-height:1.2;">
+                      Control<span style="color:${COLORS.primary};">IA</span><span style="color:${COLORS.textMuted};font-weight:500;">.io</span>
+                    </p>
+                    <p style="margin:8px 0 0;font-size:11px;font-weight:500;color:${COLORS.textMuted};letter-spacing:1.2px;text-transform:uppercase;">
+                      Inteligência Artificial privada
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 32px;font-size:0;line-height:0;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                <tr><td style="border-top:1px solid ${COLORS.border};">&nbsp;</td></tr>
+              </table>
+            </td>
+          </tr>`;
 }
 
 function wrapEmailLayout(params: {
@@ -37,9 +119,6 @@ function wrapEmailLayout(params: {
   bodyHtml: string;
   useFullLogo?: boolean;
 }): string {
-  const logoSrc = params.useFullLogo ? LOGO_MINIATURA : LOGO_ICON;
-  const logoWidth = params.useFullLogo ? 220 : 64;
-
   return `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -50,25 +129,23 @@ function wrapEmailLayout(params: {
 </head>
 <body style="margin:0;padding:0;background-color:${COLORS.bgDark};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
   <span style="display:none;max-height:0;overflow:hidden;">${escapeHtml(params.preheader)}</span>
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:${COLORS.bgDark};padding:32px 16px;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:${COLORS.bgDark};padding:40px 16px;">
     <tr>
       <td align="center">
-        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background-color:${COLORS.bgCard};border:1px solid ${COLORS.border};border-radius:12px;overflow:hidden;">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background-color:${COLORS.bgCard};border:1px solid ${COLORS.border};border-radius:16px;overflow:hidden;">
+          ${emailHeaderBrand(params.useFullLogo)}
           <tr>
-            <td style="padding:32px 32px 16px;text-align:center;background:linear-gradient(180deg,rgba(0,255,200,0.08) 0%,transparent 100%);">
-              <img src="${logoSrc}" alt="ControlIA.io" width="${logoWidth}" style="display:block;margin:0 auto;max-width:100%;height:auto;" />
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:8px 32px 32px;color:${COLORS.text};font-size:16px;line-height:1.6;">
-              <h1 style="margin:0 0 16px;font-size:22px;font-weight:700;color:${COLORS.primary};">${escapeHtml(params.title)}</h1>
+            <td style="padding:28px 36px 36px;color:${COLORS.text};font-size:16px;line-height:1.65;">
+              <h1 style="margin:0 0 20px;font-size:20px;font-weight:700;color:${COLORS.primary};line-height:1.3;">
+                ${escapeHtml(params.title)}
+              </h1>
               ${params.bodyHtml}
             </td>
           </tr>
           <tr>
-            <td style="padding:20px 32px;border-top:1px solid ${COLORS.border};text-align:center;">
-              <p style="margin:0;font-size:12px;color:${COLORS.textMuted};">
-                ControlIA.io — Inteligência Artificial privada para sua empresa
+            <td style="padding:20px 36px 24px;border-top:1px solid ${COLORS.border};text-align:center;background-color:#111111;">
+              <p style="margin:0;font-size:12px;color:${COLORS.textMuted};line-height:1.5;">
+                © ControlIA.io — Inteligência Artificial privada para sua empresa
               </p>
             </td>
           </tr>
