@@ -2,19 +2,27 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CreditCard, Key, Users } from "lucide-react";
 import { RoleGate } from "@/features/auth/role-gate";
 import { AdminUsuariosTab } from "@/components/admin/admin-usuarios-tab";
+import { MasterUsuariosPlataformaTab } from "@/components/admin/master-usuarios-plataforma-tab";
 import { AdminAssinaturaTab } from "@/components/admin/admin-assinatura-tab";
 import { AdminByokTab } from "@/components/admin/admin-byok-tab";
 import { useTenantSubscription } from "@/features/admin/use-tenant-subscription";
+import { useSession } from "@/features/auth/session-context";
 
 function AdminContent() {
+  const { user } = useSession();
+  const isMaster = user.role === "master";
   const { info, isLoading, refresh } = useTenantSubscription();
 
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold">Configurações da Empresa</h1>
+        <h1 className="text-3xl font-bold">
+          {isMaster ? "Configurações e visão da plataforma" : "Configurações da Empresa"}
+        </h1>
         <p className="text-muted-foreground mt-2">
-          Gerencie colaboradores, assinatura e integrações do seu tenant
+          {isMaster
+            ? "Como Master, visualize usuários de todos os tenants e gerencie as configurações do seu contexto."
+            : "Gerencie colaboradores, assinatura e integrações do seu tenant"}
         </p>
       </div>
 
@@ -22,7 +30,7 @@ function AdminContent() {
         <TabsList className="bg-muted">
           <TabsTrigger value="usuarios">
             <Users className="mr-2 h-4 w-4" />
-            Usuários
+            {isMaster ? "Usuários (plataforma)" : "Usuários"}
           </TabsTrigger>
           <TabsTrigger value="assinatura">
             <CreditCard className="mr-2 h-4 w-4" />
@@ -35,7 +43,7 @@ function AdminContent() {
         </TabsList>
 
         <TabsContent value="usuarios">
-          <AdminUsuariosTab />
+          {isMaster ? <MasterUsuariosPlataformaTab /> : <AdminUsuariosTab />}
         </TabsContent>
 
         <TabsContent value="assinatura">
