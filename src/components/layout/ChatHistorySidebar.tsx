@@ -19,16 +19,20 @@ export function ChatHistorySidebar() {
   const { pathname } = useLocation();
   const { state } = useSidebar();
   const isCollapsed = state === "collapsed";
-  const { conversas, selectedConversaId, setSelectedConversaId, setSelectedAgenteId } =
-    useChat();
+  const {
+    conversas,
+    selectedConversaId,
+    setSelectedConversaId,
+    startNewConversation,
+    isLoadingConversas,
+  } = useChat();
 
   if (!pathname.startsWith(CHAT_PATH)) {
     return null;
   }
 
   const handleNovaConversa = () => {
-    setSelectedConversaId(null);
-    setSelectedAgenteId(null);
+    startNewConversation();
   };
 
   return (
@@ -48,7 +52,10 @@ export function ChatHistorySidebar() {
           </Button>
         )}
         <SidebarMenu>
-          {conversas.length === 0 && !isCollapsed && (
+          {isLoadingConversas && !isCollapsed && (
+            <p className="px-2 py-3 text-xs text-muted-foreground">Carregando…</p>
+          )}
+          {!isLoadingConversas && conversas.length === 0 && !isCollapsed && (
             <p className="px-2 py-3 text-xs text-muted-foreground">
               Nenhuma conversa sua ainda.
             </p>

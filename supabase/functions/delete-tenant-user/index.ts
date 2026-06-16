@@ -1,88 +1,13 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-};
+import { sendBrevoEmail } from "../_shared/brevo.ts";
+import { userRemovalEmail } from "../_shared/email-templates.ts";
+import { corsHeaders, jsonResponse } from "../_shared/cors.ts";
 
 interface DeleteBody {
   user_id?: string;
   motivo?: string;
   notify_by_email?: boolean;
-}
-
-function jsonResponse(body: Record<string, unknown>, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
-}
-
-async function sendRemovalEmail(params: {
-  toEmail: string;
-  toName: string;
-  empresaNome: string;
-  motivo?: string;
-  removedByName?: string;
-}): Promise<{ sent: boolean; warning?: string }> {
-  const apiKey = Deno.env.get("BREVO_API_KEY");
-  const senderEmail = Deno.env.get("BREVO_SENDER_EMAIL");
-  const senderName = Deno.env.get("BREVO_SENDER_NAME") ?? "ControlIA";
-
-  if (!apiKey || !senderEmail) {
-    return {
-      sent: false,
-      warning:
-        "E-mail não enviado: configure BREVO_API_KEY e BREVO_SENDER_EMAIL nos secrets da função.",
-    };
-  }
-
-  const motivoBlock = params.motivo?.trim()
-    ? `<p><strong>Motivo informado:</strong></p><p>${escapeHtml(params.motivo.trim())}</p>`
-    : "<p>Nenhum motivo adicional foi informado.</p>";
-
-  const htmlContent = `
-    <p>Olá ${escapeHtml(params.toName)},</p>
-    <p>Seu acesso à plataforma ControlIA na empresa <strong>${escapeHtml(params.empresaNome)}</strong> foi removido.</p>
-    ${motivoBlock}
-    <p>Se acredita que isso foi um engano, entre em contato com o administrador da sua empresa.</p>
-    <p style="color:#6b7280;font-size:12px;">ControlIA.io</p>
-  `;
-
-  const res = await fetch("https://api.brevo.com/v3/smtp/email", {
-    method: "POST",
-    headers: {
-      "api-key": apiKey,
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    body: JSON.stringify({
-      sender: { name: senderName, email: senderEmail },
-      to: [{ email: params.toEmail, name: params.toName }],
-      subject: "Seu acesso ao ControlIA foi removido",
-      htmlContent,
-    }),
-  });
-
-  if (!res.ok) {
-    const errText = await res.text();
-    return {
-      sent: false,
-      warning: `Falha ao enviar e-mail: ${errText.slice(0, 200)}`,
-    };
-  }
-
-  return { sent: true };
-}
-
-function escapeHtml(text: string): string {
-  return text
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
 }
 
 Deno.serve(async (req: Request) => {
@@ -188,12 +113,16 @@ Deno.serve(async (req: Request) => {
     let emailWarning: string | undefined;
 
     if (notifyByEmail) {
-      const emailResult = await sendRemovalEmail({
-        toEmail: targetPerfil.email,
-        toName: targetPerfil.nome_completo?.trim() || targetPerfil.email,
+      const template = userRemovalEmail({
+        nome: targetPerfil.nome_completo?.trim() || targetPerfil.email,
         empresaNome,
         motivo: motivo || undefined,
-        removedByName: callerPerfil.nome_completo?.trim() || callerPerfil.email,
+      });
+      const emailResult = await sendBrevoEmail({
+        toEmail: targetPerfil.email,
+        toName: targetPerfil.nome_completo?.trim() || targetPerfil.email,
+        subject: template.subject,
+        htmlContent: template.html,
       });
       emailSent = emailResult.sent;
       emailWarning = emailResult.warning;

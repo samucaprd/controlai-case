@@ -28,16 +28,13 @@ export function getSupabase(): SupabaseClient<Database> {
   return client;
 }
 
-/** Compatível com módulos da branch dev (Register, auth-context, etc.). */
-export const supabase: SupabaseClient<Database> = new Proxy(
-  {} as SupabaseClient<Database>,
-  {
-    get(_target, prop) {
-      const c = getSupabase();
-      const value = c[prop as keyof SupabaseClient<Database>];
-      return typeof value === "function"
-        ? (value as (...args: unknown[]) => unknown).bind(c)
-        : value;
-    },
+/** Compatível com imports legados (`import { supabase }`) e módulos que usam getSupabase(). */
+export const supabase = new Proxy({} as SupabaseClient<Database>, {
+  get(_target, prop) {
+    const instance = getSupabase();
+    const value = instance[prop as keyof SupabaseClient<Database>];
+    return typeof value === "function"
+      ? (value as (...args: unknown[]) => unknown).bind(instance)
+      : value;
   },
-);
+});

@@ -1,17 +1,23 @@
 {
-    "mcpServers": {
-      "context7": {
-        "command": "npx",
-        "args": ["-y", "@upstash/context7-mcp"]
-      },
-     "supabase": {
-       "url": "https://mcp.supabase.com/mcp",
-       "args": [
-         "--project-ref=hrzsdiduafuqtxitpgoy"
-       ],
-       "env": {
-         "SUPABASE_ACCESS_TOKEN": "${SUPABASE_ACCESS_TOKEN}"
-        }
+  "mcpServers": {
+    "context7": {
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp"]
+    },
+   "supabase": {
+     "url": "https://mcp.supabase.com/mcp",
+     "args": [
+       "--project-ref=hrzsdiduafuqtxitpgoy"
+     ],
+     "env": {
+       "SUPABASE_ACCESS_TOKEN": "sbp_86b172bd0d609133e20180b37332659dee3d5846"
+      }
+    },
+    "brevo": {
+      "url": "https://mcp.brevo.com/v1/brevo/mcp",
+      "headers": {
+        "Authorization": "Bearer eyJhcGlfa2V5IjoieGtleXNpYi05ZmI5NWNmODljMTIyZGQwNzlmODJlNzIzY2M1NzE3N2Y2ZWYwOWNlODkyZjBlZWNjYWQ1MTYxNWE2OTc5ZTY3LWh1MEpUeU9YaWdtcjBPaW8ifQ=="
       }
     }
   }
+}

@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
+import { parseByokFromContexto } from "@/lib/byok/contexto-ia";
+import type { LlmProviderId } from "@/lib/byok/types";
 import { getSupabase } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/is-configured";
 import { useSession } from "@/features/auth/session-context";
@@ -18,6 +20,10 @@ export interface TenantSubscriptionInfo {
   proximaCobranca: string | null;
   stripeCustomerId: string | null;
   chaveApiConfigurada: boolean;
+  byokEnabled: boolean;
+  llmProvider: LlmProviderId;
+  contextoIa: unknown;
+  updatedAt: string | null;
   features: string[];
 }
 
@@ -58,6 +64,8 @@ export function useTenantSubscription() {
         ? (plano.features as unknown[]).filter((f): f is string => typeof f === "string")
         : [];
 
+      const byok = parseByokFromContexto(empresa.contexto_ia);
+
       setInfo({
         empresaId,
         empresaNome: (empresa.nome as string) ?? user.empresaNome,
@@ -73,6 +81,10 @@ export function useTenantSubscription() {
         proximaCobranca: (empresa.proxima_cobranca as string) ?? null,
         stripeCustomerId: (empresa.stripe_customer_id as string) ?? null,
         chaveApiConfigurada: Boolean(empresa.chave_api_configurada),
+        byokEnabled: byok.enabled,
+        llmProvider: byok.provider,
+        contextoIa: empresa.contexto_ia,
+        updatedAt: (empresa.updated_at as string) ?? null,
         features,
       });
     } catch (err) {

@@ -9,7 +9,10 @@
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
-    "smoke:supabase": "node scripts/smoke-supabase.mjs"
+    "smoke:supabase": "node scripts/smoke-supabase.mjs",
+    "smoke:byok": "node scripts/smoke-byok.mjs",
+    "smoke:agentes": "node scripts/smoke-agentes.mjs",
+    "deploy:epic5": "node scripts/deploy-epic5-functions.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

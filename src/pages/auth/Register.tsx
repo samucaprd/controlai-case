@@ -8,11 +8,17 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Link, useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { z } from "zod";
 import { supabase } from "@/lib/supabase/client";
+import {
+  checkEmpresaDisponivel,
+  sendWelcomeEmail,
+} from "@/lib/api/auth-email";
 import { toast } from "sonner";
+import { AlertCircle, Loader2 } from "lucide-react";
 
 const registerSchema = z
   .object({
@@ -37,6 +43,39 @@ export default function Register() {
     confirmPassword: "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [companyCheckLoading, setCompanyCheckLoading] = useState(false);
+  const [companyDisponivel, setCompanyDisponivel] = useState<boolean | null>(
+    null,
+  );
+  const [companyMotivo, setCompanyMotivo] = useState<string | null>(null);
+
+  const verifyCompany = useCallback(async (company: string) => {
+    const trimmed = company.trim();
+    if (trimmed.length < 2) {
+      setCompanyDisponivel(null);
+      setCompanyMotivo(null);
+      return;
+    }
+
+    setCompanyCheckLoading(true);
+    try {
+      const result = await checkEmpresaDisponivel(trimmed);
+      setCompanyDisponivel(result.disponivel);
+      setCompanyMotivo(result.motivo);
+    } catch {
+      setCompanyDisponivel(null);
+      setCompanyMotivo(null);
+    } finally {
+      setCompanyCheckLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      void verifyCompany(formData.company);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [formData.company, verifyCompany]);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,27 +86,56 @@ export default function Register() {
       return;
     }
 
+    if (companyDisponivel === false) {
+      toast.error(
+        companyMotivo ??
+          "Esta empresa já está cadastrada. Solicite um convite ao administrador.",
+      );
+      return;
+    }
+
     setIsSubmitting(true);
 
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email: parsed.data.email,
       password: parsed.data.password,
       options: {
         data: {
           nome_completo: parsed.data.name,
-          empresa_nome: parsed.data.company,
+          empresa_nome: parsed.data.company.trim(),
         },
       },
     });
 
     if (error) {
-      toast.error(error.message);
+      const msg = error.message.toLowerCase();
+      if (
+        msg.includes("empresa já cadastrada") ||
+        msg.includes("unique") ||
+        msg.includes("duplicate")
+      ) {
+        toast.error(
+          "Esta empresa já está cadastrada. Solicite um convite ao administrador ou faça login.",
+        );
+      } else {
+        toast.error(error.message);
+      }
       setIsSubmitting(false);
       return;
     }
 
+    if (data.session) {
+      try {
+        await sendWelcomeEmail();
+      } catch {
+        // boas-vindas é best-effort
+      }
+    }
+
     toast.success(
-      "Conta criada! Verifique seu email se a confirmação estiver habilitada, ou faça login.",
+      data.session
+        ? "Conta criada com sucesso! Verifique seu e-mail de boas-vindas."
+        : "Conta criada! Verifique seu e-mail se a confirmação estiver habilitada, ou faça login.",
     );
     navigate("/auth/login");
     setIsSubmitting(false);
@@ -88,7 +156,7 @@ export default function Register() {
           <CardHeader className="space-y-1">
             <CardTitle className="text-2xl">Criar Conta</CardTitle>
             <CardDescription>
-              Preencha os dados para começar gratuitamente
+              Cadastre sua empresa e comece gratuitamente no plano Free
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -109,17 +177,42 @@ export default function Register() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="company">Empresa</Label>
-                <Input
-                  id="company"
-                  type="text"
-                  placeholder="Minha Empresa Ltda"
-                  value={formData.company}
-                  onChange={(e) =>
-                    setFormData({ ...formData, company: e.target.value })
-                  }
-                  required
-                  className="bg-input border-border"
-                />
+                <div className="relative">
+                  <Input
+                    id="company"
+                    type="text"
+                    placeholder="Minha Empresa Ltda"
+                    value={formData.company}
+                    onChange={(e) =>
+                      setFormData({ ...formData, company: e.target.value })
+                    }
+                    required
+                    className="bg-input border-border pr-10"
+                  />
+                  {companyCheckLoading && (
+                    <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
+                  )}
+                </div>
+                {companyDisponivel === false && companyMotivo && (
+                  <Alert variant="destructive" className="py-2">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription className="text-sm">
+                      {companyMotivo}{" "}
+                      <Link to="/auth/login" className="underline font-medium">
+                        Fazer login
+                      </Link>
+                    </AlertDescription>
+                  </Alert>
+                )}
+                {companyDisponivel === true && formData.company.trim().length >= 2 && (
+                  <p className="text-xs text-primary">
+                    Nome de empresa disponível para cadastro.
+                  </p>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Cada empresa pode ter apenas um cadastro inicial. Colaboradores
+                  entram via convite do administrador.
+                </p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
@@ -168,7 +261,11 @@ export default function Register() {
               </div>
               <Button
                 type="submit"
-                disabled={isSubmitting}
+                disabled={
+                  isSubmitting ||
+                  companyDisponivel === false ||
+                  companyCheckLoading
+                }
                 className="w-full bg-primary text-primary-foreground hover:bg-primary/90 shadow-glow-primary"
               >
                 {isSubmitting ? "Criando..." : "Criar Conta"}
