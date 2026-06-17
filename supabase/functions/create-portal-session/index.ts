@@ -72,7 +72,7 @@ Deno.serve(async (req: Request) => {
     const siteUrl = getSiteUrl();
     const session = await stripe.billingPortal.sessions.create({
       customer: empresa.stripe_customer_id as string,
-      return_url: `${siteUrl}/dashboard/admin?tab=assinatura`,
+      return_url: `${siteUrl}/dashboard/assinatura`,
     });
 
     return jsonResponse({ success: true, url: session.url });

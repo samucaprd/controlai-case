@@ -15,7 +15,7 @@ import { useSession } from "@/features/auth/session-context";
 
 export function AppHeader() {
   const navigate = useNavigate();
-  const { user, signOut, canManageTenant } = useSession();
+  const { user, signOut, canManageTenant, isAuthenticated } = useSession();
   const initials = user.nome
     .split(" ")
     .map((n) => n[0])
@@ -51,21 +51,21 @@ export function AppHeader() {
               <p className="text-xs font-normal text-muted-foreground">{user.email}</p>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
+            {isAuthenticated && (
+              <DropdownMenuItem asChild>
+                <Link to="/dashboard/assinatura">
+                  <CreditCard className="mr-2 h-4 w-4" />
+                  Gerenciar assinatura
+                </Link>
+              </DropdownMenuItem>
+            )}
             {canManageTenant && (
-              <>
-                <DropdownMenuItem asChild>
-                  <Link to="/dashboard/admin?tab=assinatura">
-                    <CreditCard className="mr-2 h-4 w-4" />
-                    Upgrade de assinatura
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link to="/dashboard/admin">
-                    <Settings className="mr-2 h-4 w-4" />
-                    Configurações
-                  </Link>
-                </DropdownMenuItem>
-              </>
+              <DropdownMenuItem asChild>
+                <Link to="/dashboard/admin">
+                  <Settings className="mr-2 h-4 w-4" />
+                  Configurações
+                </Link>
+              </DropdownMenuItem>
             )}
             <DropdownMenuItem>
               <User className="mr-2 h-4 w-4" />

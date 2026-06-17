@@ -13,6 +13,7 @@ import Dashboard from "./pages/Dashboard";
 import Colaborador from "./pages/dashboard/Colaborador";
 import AgentesIA from "./pages/dashboard/AgentesIA";
 import Admin from "./pages/dashboard/Admin";
+import Assinatura from "./pages/dashboard/Assinatura";
 import Master from "./pages/dashboard/Master";
 import NotFound from "./pages/NotFound";
 import { SessionProvider } from "@/features/auth/session-context";
@@ -46,6 +47,7 @@ const App = () => (
             <Route path="colaborador" element={<Colaborador />} />
             <Route path="agentes-ia" element={<AgentesIA />} />
             <Route path="admin" element={<Admin />} />
+            <Route path="assinatura" element={<Assinatura />} />
             <Route path="master" element={<Master />} />
           </Route>
           

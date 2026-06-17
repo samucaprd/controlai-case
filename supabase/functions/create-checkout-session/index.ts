@@ -139,8 +139,8 @@ Deno.serve(async (req: Request) => {
     const sessionParams: Record<string, unknown> = {
       mode: "subscription",
       line_items: [{ price: priceId, quantity: 1 }],
-      success_url: `${siteUrl}/dashboard/admin?tab=assinatura&checkout=success`,
-      cancel_url: `${siteUrl}/dashboard/admin?tab=assinatura&checkout=cancel`,
+      success_url: `${siteUrl}/dashboard/assinatura?checkout=success`,
+      cancel_url: `${siteUrl}/dashboard/assinatura?checkout=cancel`,
       client_reference_id: String(empresaId),
       metadata,
       subscription_data: { metadata },
