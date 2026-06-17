@@ -18,6 +18,9 @@
       "headers": {
         "Authorization": "Bearer eyJhcGlfa2V5IjoieGtleXNpYi05ZmI5NWNmODljMTIyZGQwNzlmODJlNzIzY2M1NzE3N2Y2ZWYwOWNlODkyZjBlZWNjYWQ1MTYxNWE2OTc5ZTY3LWh1MEpUeU9YaWdtcjBPaW8ifQ=="
       }
+    },
+    "stripe": {
+      "url": "https://mcp.stripe.com"
     }
   }
 }
