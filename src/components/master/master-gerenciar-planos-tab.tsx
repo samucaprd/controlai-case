@@ -164,10 +164,12 @@ export function MasterGerenciarPlanosTab({
                     variant={isStripeSynced(plano.stripe_price_id) ? "default" : "secondary"}
                     className="text-xs font-normal"
                   >
-                    {plano.preco_mensal <= 0
-                      ? "Gratuito"
-                      : isStripeSynced(plano.stripe_price_id)
-                        ? "Stripe sincronizado"
+                    {isStripeSynced(plano.stripe_price_id)
+                      ? plano.preco_mensal <= 0
+                        ? "Stripe sincronizado (R$ 0)"
+                        : "Stripe sincronizado"
+                      : plano.preco_mensal <= 0
+                        ? "Gratuito — sync pendente"
                         : "Stripe pendente"}
                   </Badge>
                 </div>

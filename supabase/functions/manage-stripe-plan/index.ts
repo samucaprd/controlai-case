@@ -89,21 +89,6 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({ error: "nome é obrigatório" }, 400);
     }
 
-    if (precoMensal <= 0) {
-      if (productId) {
-        await stripe.products.update(productId, { active: false, name: nome });
-      }
-      if (isRealStripePriceId(priceId)) {
-        await stripe.prices.update(priceId!, { active: false });
-      }
-      return jsonResponse({
-        success: true,
-        stripe_product_id: productId,
-        stripe_price_id: null,
-        message: "Plano gratuito — sem preço no Stripe.",
-      });
-    }
-
     const productMetadata = body.plano_id
       ? { controlia_plano_id: String(body.plano_id) }
       : undefined;
@@ -123,11 +108,12 @@ Deno.serve(async (req: Request) => {
       });
     }
 
+    const unitAmount = toCents(precoMensal);
     let needsNewPrice = true;
     if (isRealStripePriceId(priceId)) {
       const existing = await stripe.prices.retrieve(priceId!);
       if (
-        existing.unit_amount === toCents(precoMensal) &&
+        existing.unit_amount === unitAmount &&
         existing.currency === "brl" &&
         existing.active
       ) {
@@ -141,7 +127,7 @@ Deno.serve(async (req: Request) => {
     if (needsNewPrice) {
       const price = await stripe.prices.create({
         product: productId,
-        unit_amount: toCents(precoMensal),
+        unit_amount: unitAmount,
         currency: "brl",
         recurring: { interval: "month" },
         active: isActive,
@@ -164,6 +150,10 @@ Deno.serve(async (req: Request) => {
       success: true,
       stripe_product_id: productId,
       stripe_price_id: priceId,
+      message:
+        precoMensal <= 0
+          ? "Plano gratuito sincronizado no Stripe (R$ 0/mês)."
+          : undefined,
     });
   } catch (err) {
     console.error("[manage-stripe-plan]", err);
