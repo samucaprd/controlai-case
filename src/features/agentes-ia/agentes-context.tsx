@@ -38,14 +38,14 @@ interface AgentesContextValue {
 const AgentesContext = createContext<AgentesContextValue | undefined>(undefined);
 
 export function AgentesProvider({ children }: { children: ReactNode }) {
-  const { user } = useSession();
+  const { user, isMaster } = useSession();
   const useSupabase = isSupabaseConfigured();
   const { info } = useTenantSubscription();
   const [agentes, setAgentes] = useState<AgenteIA[]>([]);
   const [isLoading, setIsLoading] = useState(useSupabase);
 
-  const maxAgentes = info?.maxAgentes ?? 0;
-  const canCreateMore = agentes.length < maxAgentes;
+  const maxAgentes = isMaster ? 0 : (info?.maxAgentes ?? 0);
+  const canCreateMore = isMaster || agentes.length < (info?.maxAgentes ?? 0);
 
   const fetchAgentes = useCallback(async () => {
     if (!useSupabase || !user?.empresaId) {
@@ -73,9 +73,9 @@ export function AgentesProvider({ children }: { children: ReactNode }) {
   const createAgente = useCallback(
     async (payload: AgenteIaPayload) => {
       if (!user?.empresaId) throw new Error("Empresa não identificada.");
-      if (agentes.length >= maxAgentes) {
+      if (!isMaster && agentes.length >= (info?.maxAgentes ?? 0)) {
         throw new Error(
-          `Limite do plano atingido: máximo ${maxAgentes} agente(s).`,
+          `Limite do plano atingido: máximo ${info?.maxAgentes ?? 0} agente(s).`,
         );
       }
       const created = await createAgenteIa(
@@ -86,7 +86,7 @@ export function AgentesProvider({ children }: { children: ReactNode }) {
       setAgentes((prev) => [created, ...prev]);
       return created;
     },
-    [agentes.length, maxAgentes, user?.empresaId, user?.id],
+    [agentes.length, info?.maxAgentes, isMaster, user?.empresaId, user?.id],
   );
 
   const updateAgente = useCallback(

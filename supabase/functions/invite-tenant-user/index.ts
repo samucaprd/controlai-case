@@ -69,6 +69,8 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    const isMaster = callerPerfil.role === "master";
+
     const body = (await req.json()) as InviteBody;
     const email = body.email?.trim().toLowerCase() ?? "";
     const nomeCompleto = body.nome_completo?.trim() ?? "";
@@ -117,7 +119,7 @@ Deno.serve(async (req: Request) => {
       .eq("empresa_id", callerPerfil.empresa_id)
       .eq("status", "ativo");
 
-    if (maxUsuarios > 0 && (userCount ?? 0) >= maxUsuarios) {
+    if (!isMaster && maxUsuarios > 0 && (userCount ?? 0) >= maxUsuarios) {
       return jsonResponse(
         {
           error: `Limite de usuários do plano atingido (máximo ${maxUsuarios}).`,

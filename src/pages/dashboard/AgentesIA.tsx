@@ -8,12 +8,14 @@ import { AgenteFormDialog } from "@/components/agentes-ia/agente-form-dialog";
 import { useAgentes } from "@/features/agentes-ia/agentes-context";
 import { useTenantSubscription } from "@/features/admin/use-tenant-subscription";
 import { RoleGate } from "@/features/auth/role-gate";
+import { useSession } from "@/features/auth/session-context";
 import type { AgenteFormMode, AgenteIA } from "@/components/agentes-ia/types";
 import { toast } from "sonner";
 
 function AgentesIAContent() {
   const { agentes, isLoading, canCreateMore, maxAgentes } = useAgentes();
   const { info } = useTenantSubscription();
+  const { isMaster } = useSession();
   const [formOpen, setFormOpen] = useState(false);
   const [formMode, setFormMode] = useState<AgenteFormMode>("create");
   const [editingAgente, setEditingAgente] = useState<AgenteIA | null>(null);
@@ -46,7 +48,9 @@ function AgentesIAContent() {
           </p>
           {info ? (
             <p className="mt-1 text-sm text-muted-foreground">
-              Plano {info.planoNome}: {agentes.length}/{maxAgentes} agentes utilizados
+              {isMaster
+                ? `Plano ${info.planoNome}: ${agentes.length} agentes (ilimitado — Master)`
+                : `Plano ${info.planoNome}: ${agentes.length}/${maxAgentes || info.maxAgentes} agentes utilizados`}
             </p>
           ) : null}
         </div>

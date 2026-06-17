@@ -4,6 +4,7 @@ export interface TenantUsageLimits {
   max_usuarios: number;
   max_agentes: number;
   limite_mensagens_mes: number;
+  ilimitado?: boolean;
 }
 
 export interface TenantUsageSnapshot {
@@ -46,6 +47,7 @@ export async function fetchTenantUsage(
       max_usuarios: Number(limites?.max_usuarios ?? 0),
       max_agentes: Number(limites?.max_agentes ?? 0),
       limite_mensagens_mes: Number(limites?.limite_mensagens_mes ?? 0),
+      ilimitado: Boolean(limites?.ilimitado),
     },
   };
 }

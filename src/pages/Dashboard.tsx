@@ -24,7 +24,7 @@ function formatTokens(value: number): string {
 }
 
 export default function Dashboard() {
-  const { isColaborador } = useSession();
+  const { isColaborador, isMaster } = useSession();
   const { usage, isLoading, useSupabase } = useTenantUsage();
 
   if (isColaborador) {
@@ -32,33 +32,40 @@ export default function Dashboard() {
   }
 
   const limites = usage?.limites;
+  const unlimited = isMaster || Boolean(limites?.ilimitado);
+
+  const formatLimit = (used: number, limit: number | undefined) => {
+    if (unlimited) return `${used} (ilimitado)`;
+    return `${used}/${limit ?? "—"}`;
+  };
+
   const stats = usage
     ? [
         {
           title: "Usuários ativos",
-          value: `${usage.usuarios_ativos}/${limites?.max_usuarios ?? "—"}`,
-          percent: usagePercent(
-            usage.usuarios_ativos,
-            limites?.max_usuarios ?? 0,
-          ),
+          value: formatLimit(usage.usuarios_ativos, limites?.max_usuarios),
+          percent: unlimited
+            ? 0
+            : usagePercent(usage.usuarios_ativos, limites?.max_usuarios ?? 0),
           icon: Users,
         },
         {
           title: "Mensagens (mês)",
-          value: `${usage.mensagens_enviadas}/${limites?.limite_mensagens_mes ?? "—"}`,
-          percent: usagePercent(
-            usage.mensagens_enviadas,
-            limites?.limite_mensagens_mes ?? 0,
-          ),
+          value: formatLimit(usage.mensagens_enviadas, limites?.limite_mensagens_mes),
+          percent: unlimited
+            ? 0
+            : usagePercent(
+                usage.mensagens_enviadas,
+                limites?.limite_mensagens_mes ?? 0,
+              ),
           icon: MessageSquare,
         },
         {
           title: "Agentes ativos",
-          value: `${usage.agentes_ativos}/${limites?.max_agentes ?? "—"}`,
-          percent: usagePercent(
-            usage.agentes_ativos,
-            limites?.max_agentes ?? 0,
-          ),
+          value: formatLimit(usage.agentes_ativos, limites?.max_agentes),
+          percent: unlimited
+            ? 0
+            : usagePercent(usage.agentes_ativos, limites?.max_agentes ?? 0),
           icon: Bot,
         },
         {
@@ -137,21 +144,30 @@ export default function Dashboard() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
-            <p>
-              <span className="text-muted-foreground">Usuários: </span>
-              bloqueio ao convidar quando o plano atinge{" "}
-              <strong>{limites?.max_usuarios ?? "—"}</strong> colaboradores.
-            </p>
-            <p>
-              <span className="text-muted-foreground">Agentes: </span>
-              limite de <strong>{limites?.max_agentes ?? "—"}</strong> agentes
-              ativos por tenant.
-            </p>
-            <p>
-              <span className="text-muted-foreground">Mensagens: </span>
-              até <strong>{limites?.limite_mensagens_mes ?? "—"}</strong>{" "}
-              mensagens por mês no chat.
-            </p>
+            {unlimited ? (
+              <p className="text-muted-foreground">
+                Como <strong>Master</strong>, os limites de usuários, agentes e mensagens
+                não se aplicam ao seu tenant.
+              </p>
+            ) : (
+              <>
+                <p>
+                  <span className="text-muted-foreground">Usuários: </span>
+                  bloqueio ao convidar quando o plano atinge{" "}
+                  <strong>{limites?.max_usuarios ?? "—"}</strong> colaboradores.
+                </p>
+                <p>
+                  <span className="text-muted-foreground">Agentes: </span>
+                  limite de <strong>{limites?.max_agentes ?? "—"}</strong> agentes
+                  ativos por tenant.
+                </p>
+                <p>
+                  <span className="text-muted-foreground">Mensagens: </span>
+                  até <strong>{limites?.limite_mensagens_mes ?? "—"}</strong>{" "}
+                  mensagens por mês no chat.
+                </p>
+              </>
+            )}
           </CardContent>
         </Card>
 

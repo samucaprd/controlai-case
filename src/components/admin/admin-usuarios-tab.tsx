@@ -39,7 +39,7 @@ function initials(nome: string) {
 }
 
 export function AdminUsuariosTab() {
-  const { user: sessionUser } = useSession();
+  const { user: sessionUser, isMaster } = useSession();
   const { users, isLoading, updateUser, addUser, saveUser, removeUser } =
     useTenantUsers();
   const useSupabase = isSupabaseConfigured();
@@ -50,7 +50,8 @@ export function AdminUsuariosTab() {
     usage?.limites.max_usuarios ?? subscriptionInfo?.maxUsuarios ?? 0;
   const usuariosAtivos =
     usage?.usuarios_ativos ?? users.filter((u) => u.status === "ativo").length;
-  const atUserLimit = maxUsuarios > 0 && usuariosAtivos >= maxUsuarios;
+  const atUserLimit =
+    !isMaster && maxUsuarios > 0 && usuariosAtivos >= maxUsuarios;
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<TenantUserFormMode>("create");
   const [editingUser, setEditingUser] = useState<TenantUser | null>(null);
@@ -147,9 +148,11 @@ export function AdminUsuariosTab() {
             <CardTitle>Gerenciar Usuários</CardTitle>
             <CardDescription>
               Colaboradores da empresa {sessionUser.empresaNome} —{" "}
-              {maxUsuarios > 0
-                ? `${usuariosAtivos}/${maxUsuarios} usuários do plano`
-                : "apenas do seu tenant"}
+              {isMaster
+                ? `${usuariosAtivos} usuários (ilimitado — Master)`
+                : maxUsuarios > 0
+                  ? `${usuariosAtivos}/${maxUsuarios} usuários do plano`
+                  : "apenas do seu tenant"}
             </CardDescription>
           </div>
           <Button
