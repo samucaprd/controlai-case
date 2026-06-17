@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { PlanoFormDialog, type PlanoFormMode } from "@/components/master/plano-form-dialog";
 import { formatPlanoPreco } from "@/features/master/format";
+import { isStripeSynced } from "@/lib/api/stripe";
 import type { MasterPlano, PlanoFormInput } from "@/features/master/types";
 import { toast } from "sonner";
 
@@ -27,6 +28,7 @@ interface MasterGerenciarPlanosTabProps {
   onUpdate: (id: number, input: PlanoFormInput) => Promise<void>;
   onDelete: (id: number) => Promise<void>;
   onToggleActive: (id: number, isActive: boolean) => Promise<void>;
+  onSyncAllStripe?: () => Promise<void>;
 }
 
 export function MasterGerenciarPlanosTab({
@@ -36,12 +38,14 @@ export function MasterGerenciarPlanosTab({
   onUpdate,
   onDelete,
   onToggleActive,
+  onSyncAllStripe,
 }: MasterGerenciarPlanosTabProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<PlanoFormMode>("create");
   const [editing, setEditing] = useState<MasterPlano | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<MasterPlano | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
   const openCreate = () => {
     setDialogMode("create");
@@ -99,10 +103,30 @@ export function MasterGerenciarPlanosTab({
             Configure e gerencie os planos disponíveis
           </p>
         </div>
-        <Button className="gap-2 bg-primary hover:bg-primary/90 shrink-0" onClick={openCreate}>
-          <Plus className="h-4 w-4" />
-          Novo Plano
-        </Button>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center shrink-0">
+          {onSyncAllStripe && (
+            <Button
+              variant="outline"
+              className="gap-2"
+              disabled={syncing || isLoading}
+              onClick={() => {
+                setSyncing(true);
+                void onSyncAllStripe()
+                  .then(() => toast.success("Planos sincronizados com o Stripe."))
+                  .catch((err) =>
+                    toast.error(err instanceof Error ? err.message : "Erro ao sincronizar."),
+                  )
+                  .finally(() => setSyncing(false));
+              }}
+            >
+              {syncing ? "Sincronizando…" : "Sincronizar Stripe"}
+            </Button>
+          )}
+          <Button className="gap-2 bg-primary hover:bg-primary/90" onClick={openCreate}>
+            <Plus className="h-4 w-4" />
+            Novo Plano
+          </Button>
+        </div>
       </div>
 
       {isLoading && (
@@ -136,8 +160,15 @@ export function MasterGerenciarPlanosTab({
                 </div>
 
                 <div className="flex items-center gap-2 mt-3">
-                  <Badge variant="secondary" className="text-xs font-normal">
-                    Stripe
+                  <Badge
+                    variant={isStripeSynced(plano.stripe_price_id) ? "default" : "secondary"}
+                    className="text-xs font-normal"
+                  >
+                    {plano.preco_mensal <= 0
+                      ? "Gratuito"
+                      : isStripeSynced(plano.stripe_price_id)
+                        ? "Stripe sincronizado"
+                        : "Stripe pendente"}
                   </Badge>
                 </div>
 

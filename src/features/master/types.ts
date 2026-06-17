@@ -6,6 +6,7 @@ export interface MasterPlano {
   max_agentes: number;
   limite_mensagens_mes: number;
   stripe_price_id: string | null;
+  stripe_product_id: string | null;
   features: string[];
   is_active: boolean;
   cor: string | null;
@@ -53,7 +54,6 @@ export interface PlanoFormInput {
   max_usuarios: number;
   max_agentes: number;
   limite_mensagens_mes: number;
-  stripe_price_id: string;
   features: string[];
   is_active: boolean;
   cor: string;

@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/collapsible";
 import { AgenteQuickCard } from "@/components/chat/agente-quick-card";
 import { useChat } from "@/features/chat/chat-context";
+import { useSession } from "@/features/auth/session-context";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -27,6 +28,7 @@ export default function Colaborador() {
     usage,
     selectedConversaId,
   } = useChat();
+  const { isMaster } = useSession();
 
   const [prompt, setPrompt] = useState("");
   const [agentesOpen, setAgentesOpen] = useState(true);
@@ -72,8 +74,11 @@ export default function Colaborador() {
 
       {usage && (
         <p className="text-center text-xs text-muted-foreground">
-          Mensagens este mês: {usage.used}/{usage.limit}
-          {usage.remaining === 0 ? " — limite atingido" : ""}
+          {isMaster || (usage.limit === 0 && usage.remaining < 0)
+            ? `Mensagens este mês: ${usage.used} (ilimitado — Master)`
+            : `Mensagens este mês: ${usage.used}/${usage.limit}${
+                usage.remaining === 0 ? " — limite atingido" : ""
+              }`}
         </p>
       )}
 

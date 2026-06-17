@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { logAudit } from "@/lib/audit/log-audit";
+import { archiveStripePlan, syncStripePlan } from "@/lib/api/stripe";
 import { getSupabase } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/is-configured";
 import type {
@@ -28,6 +29,7 @@ function mapPlano(row: Record<string, unknown>): MasterPlano {
     max_agentes: Number(row.max_agentes ?? 0),
     limite_mensagens_mes: Number(row.limite_mensagens_mes ?? 0),
     stripe_price_id: (row.stripe_price_id as string) ?? null,
+    stripe_product_id: (row.stripe_product_id as string) ?? null,
     features: parseFeatures(row.features),
     is_active: Boolean(row.is_active),
     cor: (row.cor as string) ?? null,
@@ -268,7 +270,6 @@ export function useMasterPlatform() {
           max_usuarios: maxUsuarios,
           max_agentes: input.max_agentes,
           limite_mensagens_mes: input.limite_mensagens_mes,
-          stripe_price_id: input.stripe_price_id.trim() || "price_placeholder",
           features: input.features,
           is_active: input.is_active,
           cor: input.cor,
@@ -276,6 +277,14 @@ export function useMasterPlatform() {
         .select("id")
         .single();
       if (error) throw error;
+
+      await syncStripePlan({
+        plano_id: data.id as number,
+        nome: input.nome.trim(),
+        preco_mensal: input.preco_mensal,
+        is_active: input.is_active,
+      });
+
       await logAudit({
         acao: "plano_criado",
         entidade_tipo: "plano",
@@ -291,6 +300,17 @@ export function useMasterPlatform() {
     async (id: number, input: PlanoFormInput) => {
       const supabase = getSupabase();
       const maxUsuarios = input.usuarios_ilimitados ? 9999 : input.max_usuarios;
+      const existing = planos.find((p) => p.id === id);
+
+      await syncStripePlan({
+        plano_id: id,
+        nome: input.nome.trim(),
+        preco_mensal: input.preco_mensal,
+        stripe_price_id: existing?.stripe_price_id,
+        stripe_product_id: existing?.stripe_product_id,
+        is_active: input.is_active,
+      });
+
       const { error } = await supabase
         .from("planos")
         .update({
@@ -299,7 +319,6 @@ export function useMasterPlatform() {
           max_usuarios: maxUsuarios,
           max_agentes: input.max_agentes,
           limite_mensagens_mes: input.limite_mensagens_mes,
-          stripe_price_id: input.stripe_price_id.trim() || "price_placeholder",
           features: input.features,
           is_active: input.is_active,
           cor: input.cor,
@@ -314,11 +333,16 @@ export function useMasterPlatform() {
       });
       await fetchData();
     },
-    [fetchData],
+    [fetchData, planos],
   );
 
   const deletePlano = useCallback(
     async (id: number) => {
+      try {
+        await archiveStripePlan(id);
+      } catch {
+        // Plano pode não ter produto Stripe — segue exclusão
+      }
       const supabase = getSupabase();
       const { error } = await supabase.from("planos").delete().eq("id", id);
       if (error) throw error;
@@ -334,6 +358,17 @@ export function useMasterPlatform() {
 
   const togglePlanoActive = useCallback(
     async (id: number, isActive: boolean) => {
+      const plano = planos.find((p) => p.id === id);
+      if (plano) {
+        await syncStripePlan({
+          plano_id: id,
+          nome: plano.nome,
+          preco_mensal: plano.preco_mensal,
+          stripe_price_id: plano.stripe_price_id,
+          stripe_product_id: plano.stripe_product_id,
+          is_active: isActive,
+        });
+      }
       const supabase = getSupabase();
       const { error } = await supabase
         .from("planos")
@@ -348,8 +383,22 @@ export function useMasterPlatform() {
       });
       await fetchData();
     },
-    [fetchData],
+    [fetchData, planos],
   );
+
+  const syncAllPlanosStripe = useCallback(async () => {
+    for (const plano of planos) {
+      await syncStripePlan({
+        plano_id: plano.id,
+        nome: plano.nome,
+        preco_mensal: plano.preco_mensal,
+        stripe_price_id: plano.stripe_price_id,
+        stripe_product_id: plano.stripe_product_id,
+        is_active: plano.is_active,
+      });
+    }
+    await fetchData();
+  }, [fetchData, planos]);
 
   return {
     empresas: filteredEmpresas,
@@ -367,6 +416,7 @@ export function useMasterPlatform() {
     updatePlano,
     deletePlano,
     togglePlanoActive,
+    syncAllPlanosStripe,
     useSupabase,
   };
 }

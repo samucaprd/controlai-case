@@ -1,13 +1,32 @@
-import { Check, CreditCard, Sparkles } from "lucide-react";
+import { useCallback, useState } from "react";
+import {
+  ArrowUpRight,
+  Check,
+  CreditCard,
+  ExternalLink,
+  Loader2,
+  Sparkles,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatBRL, formatPlanoPreco } from "@/features/master/format";
+import { usePublicPlanos } from "@/features/billing/use-public-planos";
 import type { TenantSubscriptionInfo } from "@/features/admin/use-tenant-subscription";
+import {
+  createCheckoutSession,
+  createPortalSession,
+  isStripeSynced,
+  redirectToStripe,
+  StripeApiError,
+} from "@/lib/api/stripe";
+import { toast } from "sonner";
 
 interface AdminAssinaturaTabProps {
   info: TenantSubscriptionInfo | null;
   isLoading: boolean;
+  onRefresh?: () => Promise<void>;
 }
 
 function formatDate(iso: string | null): string {
@@ -34,6 +53,13 @@ function statusBadge(status: string, isActive: boolean) {
       </Badge>
     );
   }
+  if (status === "cancelada") {
+    return (
+      <Badge variant="outline" className="font-normal">
+        Cancelada
+      </Badge>
+    );
+  }
   return (
     <Badge className="bg-primary/15 text-primary hover:bg-primary/15 font-normal">
       Ativa
@@ -41,7 +67,53 @@ function statusBadge(status: string, isActive: boolean) {
   );
 }
 
-export function AdminAssinaturaTab({ info, isLoading }: AdminAssinaturaTabProps) {
+export function AdminAssinaturaTab({
+  info,
+  isLoading,
+  onRefresh,
+}: AdminAssinaturaTabProps) {
+  const { planos: availablePlanos, isLoading: planosLoading } = usePublicPlanos();
+  const [checkoutPlanoId, setCheckoutPlanoId] = useState<number | null>(null);
+  const [portalLoading, setPortalLoading] = useState(false);
+
+  const handleCheckout = useCallback(
+    async (planoId: number) => {
+      setCheckoutPlanoId(planoId);
+      try {
+        const result = await createCheckoutSession(planoId);
+        if (result.upgraded) {
+          toast.success(result.message ?? "Plano atualizado com sucesso.");
+          await onRefresh?.();
+          return;
+        }
+        if (result.url) {
+          redirectToStripe(result.url);
+        }
+      } catch (err) {
+        const message =
+          err instanceof StripeApiError ? err.message : "Erro ao iniciar checkout.";
+        toast.error(message);
+      } finally {
+        setCheckoutPlanoId(null);
+      }
+    },
+    [onRefresh],
+  );
+
+  const handlePortal = useCallback(async () => {
+    setPortalLoading(true);
+    try {
+      const result = await createPortalSession();
+      if (result.url) redirectToStripe(result.url);
+    } catch (err) {
+      const message =
+        err instanceof StripeApiError ? err.message : "Erro ao abrir portal de cobrança.";
+      toast.error(message);
+    } finally {
+      setPortalLoading(false);
+    }
+  }, []);
+
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -62,6 +134,10 @@ export function AdminAssinaturaTab({ info, isLoading }: AdminAssinaturaTabProps)
   }
 
   const hasStripe = Boolean(info.stripeCustomerId);
+  const hasSubscription = Boolean(info.stripeSubscriptionId);
+  const upgradePlanos = availablePlanos.filter(
+    (p) => p.preco_mensal > 0 && p.id !== info.planoId && isStripeSynced(p.stripe_price_id),
+  );
 
   return (
     <div className="space-y-6">
@@ -138,28 +214,92 @@ export function AdminAssinaturaTab({ info, isLoading }: AdminAssinaturaTabProps)
         <CardHeader>
           <CardTitle className="text-base">Pagamentos (Stripe)</CardTitle>
           <CardDescription>
-            Checkout, portal de cobrança e sincronização automática serão habilitados na Fase 6
-            (Billing Stripe).
+            Assine, altere plano, pause ou cancele diretamente pelo portal Stripe.
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-dashed border-border p-4">
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-border p-4">
             <div>
               <p className="text-sm font-medium">
                 {hasStripe ? "Conta Stripe vinculada" : "Sem conta Stripe vinculada"}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
                 {hasStripe
-                  ? `Customer ID: ${info.stripeCustomerId}`
-                  : "Assinaturas pagas exigirão integração Stripe."}
+                  ? `Customer: ${info.stripeCustomerId}`
+                  : "Assine um plano pago para criar sua conta de cobrança."}
               </p>
+              {info.stripeSubscriptionStatus && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Assinatura Stripe: {info.stripeSubscriptionStatus}
+                </p>
+              )}
             </div>
-            <Badge variant="secondary">Em breve</Badge>
+            {hasStripe && (
+              <Button
+                variant="outline"
+                className="gap-2"
+                disabled={portalLoading}
+                onClick={() => void handlePortal()}
+              >
+                {portalLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <ExternalLink className="h-4 w-4" />
+                )}
+                Gerenciar cobrança
+              </Button>
+            )}
           </div>
-          {info.precoMensal > 0 && !hasStripe && (
-            <p className="text-xs text-muted-foreground mt-3">
-              Valor do plano: {formatBRL(info.precoMensal)}/mês — cobrança manual até ativação do
-              Stripe.
+
+          {!hasSubscription && info.precoMensal <= 0 && upgradePlanos.length > 0 && (
+            <p className="text-sm text-muted-foreground">
+              Você está no plano gratuito. Escolha um plano pago abaixo para ativar a cobrança
+              recorrente.
+            </p>
+          )}
+
+          {planosLoading && <Skeleton className="h-24 w-full rounded-lg" />}
+
+          {!planosLoading && upgradePlanos.length > 0 && (
+            <div className="space-y-3">
+              <p className="text-sm font-medium">
+                {hasSubscription ? "Alterar plano" : "Assinar plano pago"}
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {upgradePlanos.map((plano) => (
+                  <div
+                    key={plano.id}
+                    className="flex items-center justify-between gap-3 rounded-lg border border-border p-4"
+                  >
+                    <div className="min-w-0">
+                      <p className="font-medium truncate">{plano.nome}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {formatBRL(plano.preco_mensal)}/mês
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      className="shrink-0 gap-1"
+                      disabled={checkoutPlanoId === plano.id}
+                      onClick={() => void handleCheckout(plano.id)}
+                    >
+                      {checkoutPlanoId === plano.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <ArrowUpRight className="h-4 w-4" />
+                      )}
+                      {hasSubscription ? "Mudar" : "Assinar"}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {hasStripe && (
+            <p className="text-xs text-muted-foreground">
+              No portal Stripe você pode atualizar cartão, pausar assinatura, cancelar ou ver
+              faturas. Alterações são refletidas automaticamente na plataforma.
             </p>
           )}
         </CardContent>

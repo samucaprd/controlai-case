@@ -38,6 +38,7 @@ export interface ChatContextValue {
   isSending: boolean;
   usage: ChatUsage | null;
   byokReady: boolean;
+  subscriptionActive: boolean;
   setSelectedAgenteId: (id: string | null) => void;
   setSelectedConversaId: (id: string | null) => void;
   sendMessage: (content: string) => Promise<void>;

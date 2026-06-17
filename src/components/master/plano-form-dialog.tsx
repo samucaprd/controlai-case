@@ -31,7 +31,6 @@ const emptyForm: PlanoFormInput = {
   max_usuarios: 5,
   max_agentes: 2,
   limite_mensagens_mes: 1000,
-  stripe_price_id: "",
   features: [],
   is_active: true,
   cor: "#10B981",
@@ -45,7 +44,6 @@ function planoToForm(plano: MasterPlano): PlanoFormInput {
     max_usuarios: plano.max_usuarios,
     max_agentes: plano.max_agentes,
     limite_mensagens_mes: plano.limite_mensagens_mes,
-    stripe_price_id: plano.stripe_price_id ?? "",
     features: plano.features,
     is_active: plano.is_active,
     cor: plano.cor ?? "#10B981",
@@ -106,7 +104,8 @@ export function PlanoFormDialog({
         <DialogHeader>
           <DialogTitle>{isEdit ? "Editar Plano" : "Novo Plano"}</DialogTitle>
           <DialogDescription>
-            Configure preço, limites e recursos do plano de assinatura.
+            Configure preço, limites e recursos. O produto e preço no Stripe são criados
+            automaticamente ao salvar.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -139,17 +138,6 @@ export function PlanoFormDialog({
                 value={form.cor}
                 onChange={(e) => setForm((f) => ({ ...f, cor: e.target.value }))}
                 placeholder="#10B981"
-              />
-            </div>
-            <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="plano-stripe">Stripe Price ID</Label>
-              <Input
-                id="plano-stripe"
-                value={form.stripe_price_id}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, stripe_price_id: e.target.value }))
-                }
-                placeholder="price_..."
               />
             </div>
             <div className="space-y-2">

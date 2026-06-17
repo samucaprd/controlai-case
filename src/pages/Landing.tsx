@@ -1,8 +1,12 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "react-router-dom";
 import { Sparkles, Zap, Shield, Users, ArrowRight, Check } from "lucide-react";
+import { usePublicPlanos } from "@/features/billing/use-public-planos";
+import { formatPlanoPreco } from "@/features/master/format";
+
 const features = [{
   icon: Sparkles,
   title: "IA com Contexto Corporativo",
@@ -20,36 +24,15 @@ const features = [{
   title: "Painel de Gestão Completa",
   description: "Gerencie colaboradores, controle acessos e configure as regras de uso da IA por departamento."
 }];
-const plans = [{
-  name: "Free",
-  price: "R$ 0",
-  period: "/mês",
-  description: "Experimente gratuitamente",
-  features: ["Até 3 usuários", "Traga sua própria API", "Suporte por email", "Dashboard básico", "Segurança completa"],
-  highlighted: false
-}, {
-  name: "Básico",
-  price: "R$ 99",
-  period: "/mês",
-  description: "Ideal para pequenas equipes começando",
-  features: ["Até 10 usuários", "Traga sua própria API", "Suporte por email", "Dashboard de gestão", "Segurança completa"],
-  highlighted: false
-}, {
-  name: "Empresa",
-  price: "R$ 299",
-  period: "/mês",
-  description: "Para empresas em crescimento",
-  features: ["Até 50 usuários", "Traga sua própria API", "Suporte prioritário", "Analytics avançado", "Customização de contexto IA", "Gestão por departamento"],
-  highlighted: true
-}, {
-  name: "Master",
-  price: "Personalizado",
-  period: "",
-  description: "Solução enterprise completa",
-  features: ["Usuários ilimitados", "Traga sua própria API", "Suporte 24/7 dedicado", "SLA garantido", "Onboarding personalizado", "Infraestrutura dedicada"],
-  highlighted: false
-}];
+
+function usuariosLabel(maxUsuarios: number): string {
+  if (maxUsuarios >= 9999) return "Usuários ilimitados";
+  return `Até ${maxUsuarios} usuários`;
+}
+
 export default function Landing() {
+  const { planos, isLoading: planosLoading } = usePublicPlanos();
+
   return <div className="min-h-screen">
       {/* Navigation */}
       <nav className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -187,36 +170,79 @@ export default function Landing() {
             </p>
           </div>
           <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4">
-            {plans.map((plan, index) => <Card key={index} className={`relative border-border ${plan.highlighted ? 'border-primary shadow-glow-primary scale-105' : 'hover:border-primary/50'} transition-all`}>
-                {plan.highlighted && <div className="absolute -top-4 left-1/2 -translate-x-1/2">
-                    <Badge className="bg-secondary text-secondary-foreground">
-                      Mais Popular
-                    </Badge>
-                  </div>}
-                <CardHeader>
-                  <CardTitle>{plan.name}</CardTitle>
-                  <CardDescription>{plan.description}</CardDescription>
-                  <div className="mt-4">
-                    <span className="text-4xl font-bold">{plan.price}</span>
-                    <span className="text-muted-foreground">{plan.period}</span>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <ul className="space-y-3">
-                    {plan.features.map((feature, fIndex) => <li key={fIndex} className="flex items-center gap-2">
-                        <Check className="h-4 w-4 text-primary" />
-                        <span className="text-sm">{feature}</span>
-                      </li>)}
-                  </ul>
-                </CardContent>
-                <CardFooter>
-                  <Link to="/auth/register" className="w-full">
-                    <Button className={`w-full ${plan.highlighted ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'bg-muted hover:bg-muted/80'}`}>
-                      Começar Agora
-                    </Button>
-                  </Link>
-                </CardFooter>
-              </Card>)}
+            {planosLoading &&
+              Array.from({ length: 4 }).map((_, index) => (
+                <Skeleton key={index} className="h-96 rounded-xl" />
+              ))}
+            {!planosLoading &&
+              planos.map((plan) => {
+                const highlighted = plan.nome === "Empresa";
+                const displayFeatures =
+                  plan.features.length > 0
+                    ? plan.features
+                    : [
+                        usuariosLabel(plan.max_usuarios),
+                        `Até ${plan.max_agentes} agentes IA`,
+                        `${plan.limite_mensagens_mes.toLocaleString("pt-BR")} mensagens/mês`,
+                        "Traga sua própria API",
+                      ];
+                const ctaHref =
+                  plan.preco_mensal > 0
+                    ? `/auth/register?plano=${plan.id}`
+                    : "/auth/register";
+
+                return (
+                  <Card
+                    key={plan.id}
+                    className={`relative border-border ${highlighted ? "border-primary shadow-glow-primary scale-105" : "hover:border-primary/50"} transition-all`}
+                  >
+                    {highlighted && (
+                      <div className="absolute -top-4 left-1/2 -translate-x-1/2">
+                        <Badge className="bg-secondary text-secondary-foreground">
+                          Mais Popular
+                        </Badge>
+                      </div>
+                    )}
+                    <CardHeader>
+                      <CardTitle>{plan.nome}</CardTitle>
+                      <CardDescription>
+                        {plan.preco_mensal > 0
+                          ? "Assinatura mensal via Stripe"
+                          : "Experimente gratuitamente"}
+                      </CardDescription>
+                      <div className="mt-4">
+                        <span className="text-4xl font-bold">
+                          {plan.nome === "Master" && plan.preco_mensal <= 0
+                            ? "Personalizado"
+                            : formatPlanoPreco(plan.preco_mensal).replace("/mês", "")}
+                        </span>
+                        {plan.preco_mensal > 0 && (
+                          <span className="text-muted-foreground">/mês</span>
+                        )}
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <ul className="space-y-3">
+                        {displayFeatures.map((feature) => (
+                          <li key={feature} className="flex items-center gap-2">
+                            <Check className="h-4 w-4 text-primary" />
+                            <span className="text-sm">{feature}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </CardContent>
+                    <CardFooter>
+                      <Link to={ctaHref} className="w-full">
+                        <Button
+                          className={`w-full ${highlighted ? "bg-primary text-primary-foreground hover:bg-primary/90" : "bg-muted hover:bg-muted/80"}`}
+                        >
+                          {plan.preco_mensal > 0 ? "Assinar" : "Começar Agora"}
+                        </Button>
+                      </Link>
+                    </CardFooter>
+                  </Card>
+                );
+              })}
           </div>
         </div>
       </section>

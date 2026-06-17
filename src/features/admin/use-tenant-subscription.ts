@@ -8,6 +8,7 @@ import { useSession } from "@/features/auth/session-context";
 export interface TenantSubscriptionInfo {
   empresaId: number;
   empresaNome: string;
+  planoId: number;
   planoNome: string;
   planoCor: string | null;
   precoMensal: number;
@@ -19,6 +20,8 @@ export interface TenantSubscriptionInfo {
   dataAdesao: string | null;
   proximaCobranca: string | null;
   stripeCustomerId: string | null;
+  stripeSubscriptionId: string | null;
+  stripeSubscriptionStatus: string | null;
   chaveApiConfigurada: boolean;
   byokEnabled: boolean;
   llmProvider: LlmProviderId;
@@ -69,6 +72,7 @@ export function useTenantSubscription() {
       setInfo({
         empresaId,
         empresaNome: (empresa.nome as string) ?? user.empresaNome,
+        planoId: empresa.plano_id as number,
         planoNome: plano.nome as string,
         planoCor: (plano.cor as string) ?? null,
         precoMensal: Number(plano.preco_mensal ?? 0),
@@ -80,6 +84,8 @@ export function useTenantSubscription() {
         dataAdesao: (empresa.data_adesao as string) ?? null,
         proximaCobranca: (empresa.proxima_cobranca as string) ?? null,
         stripeCustomerId: (empresa.stripe_customer_id as string) ?? null,
+        stripeSubscriptionId: (empresa.stripe_subscription_id as string) ?? null,
+        stripeSubscriptionStatus: (empresa.stripe_subscription_status as string) ?? null,
         chaveApiConfigurada: Boolean(empresa.chave_api_configurada),
         byokEnabled: byok.enabled,
         llmProvider: byok.provider,

@@ -12,7 +12,8 @@
     "smoke:supabase": "node scripts/smoke-supabase.mjs",
     "smoke:byok": "node scripts/smoke-byok.mjs",
     "smoke:agentes": "node scripts/smoke-agentes.mjs",
-    "deploy:epic5": "node scripts/deploy-epic5-functions.mjs"
+    "deploy:epic5": "node scripts/deploy-epic5-functions.mjs",
+    "sync:secrets": "node scripts/sync-edge-secrets.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

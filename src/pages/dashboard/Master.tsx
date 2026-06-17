@@ -25,6 +25,7 @@ function MasterContent() {
     updatePlano,
     deletePlano,
     togglePlanoActive,
+    syncAllPlanosStripe,
     useSupabase,
   } = useMasterPlatform();
 
@@ -138,6 +139,7 @@ function MasterContent() {
               await togglePlanoActive(id, active);
               void refreshAudit();
             }}
+            onSyncAllStripe={syncAllPlanosStripe}
           />
         </TabsContent>
 

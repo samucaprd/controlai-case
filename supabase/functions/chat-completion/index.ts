@@ -252,6 +252,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const empresaId = perfil.empresa_id as number;
+    const isMaster = perfil.role === "master";
 
     const { data: empresa, error: empresaError } = await adminClient
       .from("empresas")
@@ -261,7 +262,7 @@ Deno.serve(async (req: Request) => {
     if (empresaError || !empresa) {
       return jsonResponse({ error: "Empresa não encontrada" }, 404);
     }
-    if (!empresa.is_active || empresa.status !== "ativa") {
+    if (!isMaster && (!empresa.is_active || empresa.status !== "ativa")) {
       return jsonResponse(
         { error: "Assinatura inativa. Contate o administrador.", code: "subscription_inactive" },
         403,
@@ -301,7 +302,7 @@ Deno.serve(async (req: Request) => {
 
     const mensagensUsadas = Number(usoRow?.mensagens_enviadas ?? 0);
     const limiteMensagens = Number(plano.limite_mensagens_mes ?? 0);
-    if (limiteMensagens > 0 && mensagensUsadas >= limiteMensagens) {
+    if (!isMaster && limiteMensagens > 0 && mensagensUsadas >= limiteMensagens) {
       return jsonResponse(
         {
           error: `Limite mensal de mensagens atingido (${limiteMensagens}).`,
@@ -437,8 +438,8 @@ Deno.serve(async (req: Request) => {
       assistant_message: llmResult.content,
       usage: {
         used: newMensagensUsadas,
-        limit: limiteMensagens,
-        remaining: Math.max(0, limiteMensagens - newMensagensUsadas),
+        limit: isMaster ? 0 : limiteMensagens,
+        remaining: isMaster ? -1 : Math.max(0, limiteMensagens - newMensagensUsadas),
       },
     });
   } catch (err) {

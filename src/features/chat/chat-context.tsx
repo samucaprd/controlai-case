@@ -21,7 +21,7 @@ const ChatContext = createContext<ChatContextValue | undefined>(undefined);
 export function ChatProvider({ children }: { children: ReactNode }) {
   const { agentesAtivos, agentesPopulares } = useAgentes();
   const { info } = useTenantSubscription();
-  const { user: session } = useSession();
+  const { user: session, isMaster } = useSession();
   const useSupabase = isSupabaseConfigured();
 
   const user: ChatUser = useMemo(
@@ -44,6 +44,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const byokReady = Boolean(
     info?.byokEnabled && info?.chaveApiConfigurada,
   );
+
+  const subscriptionActive =
+    isMaster ||
+    Boolean(info?.isActive && (info?.status === "ativa" || info?.status === "trial"));
 
   const agentes = agentesAtivos;
 
@@ -105,6 +109,13 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       const trimmed = content.trim();
       if (!trimmed) return;
 
+      if (!subscriptionActive) {
+        toast.error(
+          "Assinatura inativa ou suspensa. Peça ao administrador para regularizar o plano.",
+        );
+        return;
+      }
+
       if (!byokReady) {
         toast.error("BYOK não configurado. Peça ao administrador para cadastrar a chave API.");
         return;
@@ -139,7 +150,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         setIsSending(false);
       }
     },
-    [byokReady, selectedAgenteId, selectedConversaId, refreshConversas],
+    [subscriptionActive, byokReady, selectedAgenteId, selectedConversaId, refreshConversas],
   );
 
   const value = useMemo<ChatContextValue>(
@@ -155,6 +166,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       isSending,
       usage,
       byokReady,
+      subscriptionActive,
       setSelectedAgenteId,
       setSelectedConversaId,
       sendMessage,
@@ -173,6 +185,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       isSending,
       usage,
       byokReady,
+      subscriptionActive,
       sendMessage,
       startNewConversation,
       refreshConversas,

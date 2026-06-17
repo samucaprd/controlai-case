@@ -10,7 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { LogOut, Settings, User } from "lucide-react";
+import { CreditCard, LogOut, Settings, User } from "lucide-react";
 import { useSession } from "@/features/auth/session-context";
 
 export function AppHeader() {
@@ -52,12 +52,20 @@ export function AppHeader() {
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             {canManageTenant && (
-              <DropdownMenuItem asChild>
-                <Link to="/dashboard/admin">
-                  <Settings className="mr-2 h-4 w-4" />
-                  Configurações
-                </Link>
-              </DropdownMenuItem>
+              <>
+                <DropdownMenuItem asChild>
+                  <Link to="/dashboard/admin?tab=assinatura">
+                    <CreditCard className="mr-2 h-4 w-4" />
+                    Upgrade de assinatura
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link to="/dashboard/admin">
+                    <Settings className="mr-2 h-4 w-4" />
+                    Configurações
+                  </Link>
+                </DropdownMenuItem>
+              </>
             )}
             <DropdownMenuItem>
               <User className="mr-2 h-4 w-4" />
