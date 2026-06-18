@@ -2,11 +2,10 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders, jsonResponse } from "../_shared/cors.ts";
 import {
-  findPlanoIdByStripePrice,
   findFreePlanoId,
   getStripe,
-  mapStripeStatusToEmpresa,
 } from "../_shared/stripe.ts";
+import { applyStripeSubscription } from "../_shared/subscription-sync.ts";
 
 async function isEventProcessed(
   adminClient: ReturnType<typeof createClient>,
@@ -30,52 +29,10 @@ async function markEventProcessed(
 
 async function applySubscription(
   adminClient: ReturnType<typeof createClient>,
-  subscription: {
-    id: string;
-    customer: string | { id: string };
-    status: string;
-    current_period_end: number;
-    items: { data: Array<{ price?: { id?: string } | null }> };
-    metadata?: Record<string, string>;
-  },
+  subscription: Parameters<typeof applyStripeSubscription>[1],
   empresaIdHint?: number | null,
 ): Promise<void> {
-  const customerId =
-    typeof subscription.customer === "string"
-      ? subscription.customer
-      : subscription.customer.id;
-  const priceId = subscription.items.data[0]?.price?.id ?? null;
-  const mapped = mapStripeStatusToEmpresa(subscription.status);
-
-  let planoId = priceId
-    ? await findPlanoIdByStripePrice(adminClient, priceId)
-    : null;
-
-  const metadataPlanoId = subscription.metadata?.plano_id
-    ? Number(subscription.metadata.plano_id)
-    : null;
-  if (!planoId && metadataPlanoId) planoId = metadataPlanoId;
-
-  const update: Record<string, unknown> = {
-    stripe_customer_id: customerId,
-    stripe_subscription_id: subscription.id,
-    stripe_subscription_status: subscription.status,
-    status: mapped.status,
-    is_active: mapped.is_active,
-    proxima_cobranca: new Date(subscription.current_period_end * 1000).toISOString(),
-  };
-  if (planoId) update.plano_id = planoId;
-
-  let query = adminClient.from("empresas").update(update);
-
-  if (empresaIdHint) {
-    query = query.eq("id", empresaIdHint);
-  } else {
-    query = query.eq("stripe_customer_id", customerId);
-  }
-
-  const { error } = await query;
-  if (error) throw error;
+  await applyStripeSubscription(adminClient, subscription, empresaIdHint);
 }
 
 async function downgradeToFree(
@@ -88,6 +45,7 @@ async function downgradeToFree(
     .update({
       stripe_subscription_id: null,
       stripe_subscription_status: "canceled",
+      subscription_cancel_at: null,
       status: "ativa",
       is_active: true,
       proxima_cobranca: null,

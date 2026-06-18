@@ -17,6 +17,17 @@ export interface StripePortalResult {
   code?: string;
 }
 
+export type ManageSubscriptionAction = "cancel" | "reactivate" | "downgrade_free";
+
+export interface ManageSubscriptionResult {
+  success: boolean;
+  message?: string;
+  cancel_at?: string | null;
+  downgraded?: boolean;
+  error?: string;
+  code?: string;
+}
+
 export interface SyncStripePlanInput {
   plano_id?: number;
   nome: string;
@@ -81,6 +92,31 @@ async function invokeStripeFunction<T>(
   return payload;
 }
 
+export interface SyncCheckoutResult {
+  success: boolean;
+  message?: string;
+  plano?: {
+    id: number;
+    nome: string;
+    preco_mensal: number;
+    max_usuarios: number;
+    max_agentes: number;
+    limite_mensagens_mes: number;
+  };
+  proxima_cobranca?: string | null;
+  stripe_subscription_status?: string | null;
+  error?: string;
+  code?: string;
+}
+
+export async function syncCheckoutSession(
+  sessionId: string,
+): Promise<SyncCheckoutResult> {
+  return invokeStripeFunction<SyncCheckoutResult>("sync-checkout-session", {
+    session_id: sessionId,
+  });
+}
+
 export async function createCheckoutSession(
   planoId: number,
 ): Promise<StripeCheckoutResult> {
@@ -91,6 +127,14 @@ export async function createCheckoutSession(
 
 export async function createPortalSession(): Promise<StripePortalResult> {
   return invokeStripeFunction<StripePortalResult>("create-portal-session", {});
+}
+
+export async function manageSubscription(
+  action: ManageSubscriptionAction,
+): Promise<ManageSubscriptionResult> {
+  return invokeStripeFunction<ManageSubscriptionResult>("manage-subscription", {
+    action,
+  });
 }
 
 export async function syncStripePlan(

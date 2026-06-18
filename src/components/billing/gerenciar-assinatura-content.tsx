@@ -1,23 +1,36 @@
 import { useCallback, useState } from "react";
 import {
+  ArrowDownRight,
   ArrowUpRight,
   Check,
   CreditCard,
   ExternalLink,
   Loader2,
   Sparkles,
+  XCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { formatBRL, formatPlanoPreco } from "@/features/master/format";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { formatPlanoPreco } from "@/features/master/format";
 import { usePublicPlanos, type PublicPlano } from "@/features/billing/use-public-planos";
 import type { TenantSubscriptionInfo } from "@/features/admin/use-tenant-subscription";
 import {
   createCheckoutSession,
   createPortalSession,
   isStripeSynced,
+  manageSubscription,
   redirectToStripe,
   StripeApiError,
 } from "@/lib/api/stripe";
@@ -92,29 +105,64 @@ function currentPlanResourceLines(info: TenantSubscriptionInfo): string[] {
   ];
 }
 
+function isPlanoMaster(plano: { nome: string }): boolean {
+  return plano.nome === "Master";
+}
+
+function isPlanoFree(plano: { nome: string }): boolean {
+  return plano.nome === "Free";
+}
+
+function planPriceLabel(plano: { nome: string; preco_mensal: number }): string {
+  if (isPlanoMaster(plano) && plano.preco_mensal <= 0) return "Sob consulta";
+  return formatPlanoPreco(plano.preco_mensal);
+}
+
 function PlanoUpgradeCard({
   plano,
   isCurrent,
   isUpgrade,
+  isDowngrade,
   canManageBilling,
   hasSubscription,
+  isPaidPlan,
+  tenantOnMasterPlan,
   checkoutPlanoId,
   onCheckout,
+  onDowngradeFree,
 }: {
   plano: PublicPlano;
   isCurrent: boolean;
   isUpgrade: boolean;
+  isDowngrade: boolean;
   canManageBilling: boolean;
   hasSubscription: boolean;
+  isPaidPlan: boolean;
+  tenantOnMasterPlan: boolean;
   checkoutPlanoId: number | null;
   onCheckout: (id: number) => void;
+  onDowngradeFree: () => void;
 }) {
   const features = planResourceLines(plano);
-  const canCheckout =
+  const masterPlano = isPlanoMaster(plano);
+  const freePlano = isPlanoFree(plano);
+
+  const canCheckoutPaid =
     canManageBilling &&
     !isCurrent &&
+    !masterPlano &&
+    !tenantOnMasterPlan &&
     plano.preco_mensal > 0 &&
-    isStripeSynced(plano.stripe_price_id);
+    isStripeSynced(plano.stripe_price_id) &&
+    (hasSubscription || isUpgrade);
+
+  const canDowngradeToFree =
+    canManageBilling &&
+    !isCurrent &&
+    freePlano &&
+    isPaidPlan &&
+    hasSubscription &&
+    !tenantOnMasterPlan;
 
   return (
     <Card
@@ -141,12 +189,13 @@ function PlanoUpgradeCard({
               Upgrade
             </Badge>
           )}
+          {!isCurrent && isDowngrade && plano.preco_mensal > 0 && (
+            <Badge variant="outline" className="shrink-0 font-normal">
+              Downgrade
+            </Badge>
+          )}
         </div>
-        <CardDescription>
-          {plano.nome === "Master" && plano.preco_mensal <= 0
-            ? "Sob consulta"
-            : formatPlanoPreco(plano.preco_mensal)}
-        </CardDescription>
+        <CardDescription>{planPriceLabel(plano)}</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col flex-1 gap-4 pt-0">
         <ul className="space-y-2 flex-1">
@@ -157,19 +206,33 @@ function PlanoUpgradeCard({
             </li>
           ))}
         </ul>
-        {canCheckout && (
+        {canCheckoutPaid && (
           <Button
             size="sm"
             className="w-full gap-1"
+            variant={isDowngrade ? "outline" : "default"}
             disabled={checkoutPlanoId === plano.id}
             onClick={() => onCheckout(plano.id)}
           >
             {checkoutPlanoId === plano.id ? (
               <Loader2 className="h-4 w-4 animate-spin" />
+            ) : isDowngrade ? (
+              <ArrowDownRight className="h-4 w-4" />
             ) : (
               <ArrowUpRight className="h-4 w-4" />
             )}
             {hasSubscription ? "Mudar para este plano" : "Assinar"}
+          </Button>
+        )}
+        {canDowngradeToFree && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="w-full gap-1"
+            onClick={onDowngradeFree}
+          >
+            <ArrowDownRight className="h-4 w-4" />
+            Voltar para Free
           </Button>
         )}
         {!isCurrent && !canManageBilling && (
@@ -191,6 +254,10 @@ export function GerenciarAssinaturaContent({
   const { planos: availablePlanos, isLoading: planosLoading } = usePublicPlanos();
   const [checkoutPlanoId, setCheckoutPlanoId] = useState<number | null>(null);
   const [portalLoading, setPortalLoading] = useState(false);
+  const [subscriptionAction, setSubscriptionAction] = useState<
+    "cancel" | "downgrade_free" | "reactivate" | null
+  >(null);
+  const [subscriptionLoading, setSubscriptionLoading] = useState(false);
 
   const handleCheckout = useCallback(
     async (planoId: number) => {
@@ -230,6 +297,25 @@ export function GerenciarAssinaturaContent({
     }
   }, []);
 
+  const runSubscriptionAction = useCallback(
+    async (action: "cancel" | "downgrade_free" | "reactivate") => {
+      setSubscriptionLoading(true);
+      try {
+        const result = await manageSubscription(action);
+        toast.success(result.message ?? "Assinatura atualizada.");
+        await onRefresh?.();
+      } catch (err) {
+        const message =
+          err instanceof StripeApiError ? err.message : "Erro ao gerenciar assinatura.";
+        toast.error(message);
+      } finally {
+        setSubscriptionLoading(false);
+        setSubscriptionAction(null);
+      }
+    },
+    [onRefresh],
+  );
+
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -251,10 +337,16 @@ export function GerenciarAssinaturaContent({
 
   const hasStripe = Boolean(info.stripeCustomerId);
   const hasSubscription = Boolean(info.stripeSubscriptionId);
+  const tenantOnMasterPlan = info.planoNome === "Master";
+  const isPaidPlan = info.precoMensal > 0 && !tenantOnMasterPlan;
+  const hasPendingCancel = Boolean(info.subscriptionCancelAt);
+  const canOpenPortal = !tenantOnMasterPlan && (hasStripe || hasSubscription);
+  const canManagePaidSubscription =
+    canManageBilling && isPaidPlan && hasSubscription && !tenantOnMasterPlan;
   const currentResources = currentPlanResourceLines(info);
-  const sortedPlanos = [...availablePlanos].sort(
-    (a, b) => a.preco_mensal - b.preco_mensal,
-  );
+  const billablePlanos = [...availablePlanos]
+    .filter((plano) => !isPlanoMaster(plano))
+    .sort((a, b) => a.preco_mensal - b.preco_mensal);
 
   return (
     <div className="space-y-6">
@@ -281,9 +373,16 @@ export function GerenciarAssinaturaContent({
             />
             <span className="text-2xl font-bold">{info.planoNome}</span>
             <span className="text-xl text-muted-foreground">
-              {formatPlanoPreco(info.precoMensal)}
+              {tenantOnMasterPlan ? "Sob consulta" : formatPlanoPreco(info.precoMensal)}
             </span>
           </div>
+
+          {tenantOnMasterPlan && (
+            <p className="text-sm text-muted-foreground rounded-lg border border-dashed border-border p-4">
+              O plano Master é atribuído apenas pela equipe da plataforma. Alterações de
+              assinatura e cobrança não se aplicam a este tenant.
+            </p>
+          )}
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div className="rounded-lg border border-border p-4">
@@ -327,7 +426,74 @@ export function GerenciarAssinaturaContent({
         </CardContent>
       </Card>
 
-      {canManageBilling && (
+      {canManageBilling && isPaidPlan && (
+        <Card className="border-border">
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <XCircle className="h-4 w-4 text-muted-foreground" />
+              Cancelar ou alterar plano
+            </CardTitle>
+            <CardDescription>
+              Cancele a assinatura, volte ao plano Free ou mude para outro plano na grade abaixo.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {hasPendingCancel && (
+              <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-sm">
+                <p className="font-medium text-amber-800 dark:text-amber-200">
+                  Cancelamento agendado
+                </p>
+                <p className="text-muted-foreground mt-1">
+                  Você mantém o acesso até{" "}
+                  <strong>{formatDate(info.subscriptionCancelAt)}</strong>. Depois disso, sua
+                  empresa volta automaticamente ao plano Free.
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-3"
+                  disabled={subscriptionLoading}
+                  onClick={() => void runSubscriptionAction("reactivate")}
+                >
+                  {subscriptionLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    "Manter assinatura"
+                  )}
+                </Button>
+              </div>
+            )}
+
+            {canManagePaidSubscription && !hasPendingCancel && (
+              <div className="flex flex-wrap gap-3">
+                <Button
+                  variant="outline"
+                  disabled={subscriptionLoading}
+                  onClick={() => setSubscriptionAction("cancel")}
+                >
+                  Cancelar assinatura
+                </Button>
+                <Button
+                  variant="ghost"
+                  disabled={subscriptionLoading}
+                  onClick={() => setSubscriptionAction("downgrade_free")}
+                >
+                  Voltar para Free agora
+                </Button>
+              </div>
+            )}
+
+            {!hasSubscription && isPaidPlan && (
+              <p className="text-sm text-muted-foreground">
+                Sua empresa está no plano {info.planoNome}, mas não há assinatura Stripe ativa
+                vinculada. Use a grade de planos abaixo ou o portal de cobrança para regularizar.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {canManageBilling && !tenantOnMasterPlan && (
         <Card className="border-border">
           <CardHeader>
             <CardTitle className="text-base">Pagamentos (Stripe)</CardTitle>
@@ -352,7 +518,7 @@ export function GerenciarAssinaturaContent({
                   </p>
                 )}
               </div>
-              {hasStripe && (
+              {canOpenPortal && (
                 <Button
                   variant="outline"
                   className="gap-2"
@@ -388,18 +554,26 @@ export function GerenciarAssinaturaContent({
           </div>
         )}
 
-        {!planosLoading && sortedPlanos.length > 0 && (
+        {!planosLoading && billablePlanos.length > 0 && (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {sortedPlanos.map((plano) => (
+            {billablePlanos.map((plano) => (
               <PlanoUpgradeCard
                 key={plano.id}
                 plano={plano}
                 isCurrent={plano.id === info.planoId}
                 isUpgrade={plano.preco_mensal > info.precoMensal}
+                isDowngrade={
+                  plano.preco_mensal < info.precoMensal &&
+                  plano.preco_mensal > 0 &&
+                  !isPlanoMaster(plano)
+                }
                 canManageBilling={canManageBilling}
                 hasSubscription={hasSubscription}
+                isPaidPlan={isPaidPlan}
+                tenantOnMasterPlan={tenantOnMasterPlan}
                 checkoutPlanoId={checkoutPlanoId}
                 onCheckout={(id) => void handleCheckout(id)}
+                onDowngradeFree={() => setSubscriptionAction("downgrade_free")}
               />
             ))}
           </div>
@@ -412,6 +586,48 @@ export function GerenciarAssinaturaContent({
           </p>
         )}
       </div>
+
+      <AlertDialog
+        open={subscriptionAction !== null}
+        onOpenChange={(open) => {
+          if (!open) setSubscriptionAction(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {subscriptionAction === "cancel"
+                ? "Cancelar assinatura?"
+                : "Voltar para o plano Free?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {subscriptionAction === "cancel"
+                ? "O cancelamento será agendado para o fim do período já pago. Até lá você continua com os recursos do plano atual e depois volta ao Free automaticamente."
+                : "A assinatura será encerrada imediatamente e sua empresa passará para o plano Free. Os limites do Free passam a valer na hora."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={subscriptionLoading}>Voltar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={subscriptionLoading || subscriptionAction === null}
+              onClick={(e) => {
+                e.preventDefault();
+                if (subscriptionAction) {
+                  void runSubscriptionAction(subscriptionAction);
+                }
+              }}
+            >
+              {subscriptionLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : subscriptionAction === "cancel" ? (
+                "Confirmar cancelamento"
+              ) : (
+                "Confirmar mudança para Free"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

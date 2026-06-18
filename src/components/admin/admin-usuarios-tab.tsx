@@ -50,8 +50,10 @@ export function AdminUsuariosTab() {
     usage?.limites.max_usuarios ?? subscriptionInfo?.maxUsuarios ?? 0;
   const usuariosAtivos =
     usage?.usuarios_ativos ?? users.filter((u) => u.status === "ativo").length;
+  const unlimitedUsers =
+    isMaster || usage?.limites.ilimitado === true || subscriptionInfo?.planoNome === "Master";
   const atUserLimit =
-    !isMaster && maxUsuarios > 0 && usuariosAtivos >= maxUsuarios;
+    !unlimitedUsers && maxUsuarios > 0 && usuariosAtivos >= maxUsuarios;
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<TenantUserFormMode>("create");
   const [editingUser, setEditingUser] = useState<TenantUser | null>(null);
@@ -59,6 +61,12 @@ export function AdminUsuariosTab() {
   const [deletingUser, setDeletingUser] = useState<TenantUser | null>(null);
 
   const openCreate = () => {
+    if (atUserLimit) {
+      toast.error(
+        `Limite de ${maxUsuarios} usuários do plano atingido. Faça upgrade na aba Assinatura.`,
+      );
+      return;
+    }
     setDialogMode("create");
     setEditingUser(null);
     setDialogOpen(true);
@@ -114,6 +122,12 @@ export function AdminUsuariosTab() {
     status: "ativo" | "inativo";
   }) => {
     if (dialogMode === "create") {
+      if (atUserLimit) {
+        throw new InviteUserError(
+          `Limite de usuários do plano atingido (máximo ${maxUsuarios}).`,
+          "USER_LIMIT_REACHED",
+        );
+      }
       const result = await addUser(data);
       toast.success(
         useSupabase
@@ -148,8 +162,8 @@ export function AdminUsuariosTab() {
             <CardTitle>Gerenciar Usuários</CardTitle>
             <CardDescription>
               Colaboradores da empresa {sessionUser.empresaNome} —{" "}
-              {isMaster
-                ? `${usuariosAtivos} usuários (ilimitado — Master)`
+              {unlimitedUsers
+                ? `${usuariosAtivos} usuários (ilimitado)`
                 : maxUsuarios > 0
                   ? `${usuariosAtivos}/${maxUsuarios} usuários do plano`
                   : "apenas do seu tenant"}

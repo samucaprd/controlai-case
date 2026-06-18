@@ -22,6 +22,7 @@ export interface TenantSubscriptionInfo {
   stripeCustomerId: string | null;
   stripeSubscriptionId: string | null;
   stripeSubscriptionStatus: string | null;
+  subscriptionCancelAt: string | null;
   chaveApiConfigurada: boolean;
   byokEnabled: boolean;
   llmProvider: LlmProviderId;
@@ -86,6 +87,7 @@ export function useTenantSubscription() {
         stripeCustomerId: (empresa.stripe_customer_id as string) ?? null,
         stripeSubscriptionId: (empresa.stripe_subscription_id as string) ?? null,
         stripeSubscriptionStatus: (empresa.stripe_subscription_status as string) ?? null,
+        subscriptionCancelAt: (empresa.subscription_cancel_at as string) ?? null,
         chaveApiConfigurada: Boolean(empresa.chave_api_configurada),
         byokEnabled: byok.enabled,
         llmProvider: byok.provider,

@@ -74,3 +74,16 @@ export async function findFreePlanoId(
     .maybeSingle();
   return data?.id ? Number(data.id) : null;
 }
+
+export async function isMasterPlanoId(
+  adminClient: ReturnType<typeof import("jsr:@supabase/supabase-js@2").createClient>,
+  planoId: number | null | undefined,
+): Promise<boolean> {
+  if (!planoId) return false;
+  const { data } = await adminClient
+    .from("planos")
+    .select("nome")
+    .eq("id", planoId)
+    .maybeSingle();
+  return data?.nome === "Master";
+}

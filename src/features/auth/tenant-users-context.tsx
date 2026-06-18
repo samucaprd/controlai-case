@@ -15,6 +15,7 @@ import type { AppRole } from "./types";
 import { deleteTenantUser } from "@/lib/api/delete-tenant-user";
 import { logAudit } from "@/lib/audit/log-audit";
 import { inviteTenantUser, InviteUserError, type InviteTenantUserResult } from "@/lib/api/invite-tenant-user";
+import { fetchTenantUsage } from "@/lib/api/uso-recursos";
 import { getSupabase } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/is-configured";
 
@@ -228,6 +229,19 @@ export function TenantUsersProvider({ children }: { children: ReactNode }) {
       if (useSupabase) {
         if (input.role !== "user" && input.role !== "admin") {
           throw new InviteUserError("Papel inválido para convite.");
+        }
+
+        const usage = await fetchTenantUsage(empresaIdNumeric);
+        if (
+          usage &&
+          !usage.limites.ilimitado &&
+          usage.limites.max_usuarios > 0 &&
+          usage.usuarios_ativos >= usage.limites.max_usuarios
+        ) {
+          throw new InviteUserError(
+            `Limite de usuários do plano atingido (máximo ${usage.limites.max_usuarios}).`,
+            "USER_LIMIT_REACHED",
+          );
         }
 
         const result = await inviteTenantUser({

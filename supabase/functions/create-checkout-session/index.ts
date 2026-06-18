@@ -4,6 +4,7 @@ import { corsHeaders, jsonResponse } from "../_shared/cors.ts";
 import {
   getSiteUrl,
   getStripe,
+  isMasterPlanoId,
   isRealStripePriceId,
   mapStripeStatusToEmpresa,
 } from "../_shared/stripe.ts";
@@ -79,6 +80,24 @@ Deno.serve(async (req: Request) => {
     if (!plano.is_active) {
       return jsonResponse({ error: "Plano indisponível" }, 400);
     }
+    if ((plano.nome as string) === "Master") {
+      return jsonResponse(
+        {
+          error: "O plano Master só pode ser atribuído pela plataforma ControlIA.",
+          code: "master_plan_managed",
+        },
+        403,
+      );
+    }
+    if (await isMasterPlanoId(adminClient, empresa.plano_id as number)) {
+      return jsonResponse(
+        {
+          error: "Tenants no plano Master não podem alterar assinatura por aqui.",
+          code: "master_plan_locked",
+        },
+        403,
+      );
+    }
     if (Number(plano.preco_mensal) <= 0) {
       return jsonResponse({ error: "Este plano é gratuito e não requer checkout" }, 400);
     }
@@ -123,6 +142,7 @@ Deno.serve(async (req: Request) => {
         .update({
           plano_id: planoId,
           stripe_subscription_status: updated.status,
+          subscription_cancel_at: null,
           status: mapped.status,
           is_active: mapped.is_active,
           proxima_cobranca: new Date(updated.current_period_end * 1000).toISOString(),
@@ -139,7 +159,7 @@ Deno.serve(async (req: Request) => {
     const sessionParams: Record<string, unknown> = {
       mode: "subscription",
       line_items: [{ price: priceId, quantity: 1 }],
-      success_url: `${siteUrl}/dashboard/assinatura?checkout=success`,
+      success_url: `${siteUrl}/dashboard/assinatura?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${siteUrl}/dashboard/assinatura?checkout=cancel`,
       client_reference_id: String(empresaId),
       metadata,

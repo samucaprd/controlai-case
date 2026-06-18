@@ -1,7 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders, jsonResponse } from "../_shared/cors.ts";
-import { getSiteUrl, getStripe } from "../_shared/stripe.ts";
+import { getSiteUrl, getStripe, isMasterPlanoId } from "../_shared/stripe.ts";
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -51,14 +51,44 @@ Deno.serve(async (req: Request) => {
     const empresaId = callerPerfil.empresa_id as number;
     const { data: empresa, error: empresaError } = await adminClient
       .from("empresas")
-      .select("stripe_customer_id")
+      .select("stripe_customer_id, stripe_subscription_id, plano_id")
       .eq("id", empresaId)
       .single();
 
     if (empresaError || !empresa) {
       return jsonResponse({ error: "Empresa não encontrada" }, 404);
     }
-    if (!empresa.stripe_customer_id) {
+
+    if (await isMasterPlanoId(adminClient, empresa.plano_id as number)) {
+      return jsonResponse(
+        {
+          error: "Tenants no plano Master não utilizam o portal de cobrança.",
+          code: "master_plan_locked",
+        },
+        403,
+      );
+    }
+
+    const stripe = getStripe();
+    const siteUrl = getSiteUrl();
+
+    let customerId = empresa.stripe_customer_id as string | null;
+    if (!customerId && empresa.stripe_subscription_id) {
+      const subscription = await stripe.subscriptions.retrieve(
+        empresa.stripe_subscription_id as string,
+      );
+      customerId =
+        typeof subscription.customer === "string"
+          ? subscription.customer
+          : subscription.customer.id;
+
+      await adminClient
+        .from("empresas")
+        .update({ stripe_customer_id: customerId })
+        .eq("id", empresaId);
+    }
+
+    if (!customerId) {
       return jsonResponse(
         {
           error: "Nenhuma conta Stripe vinculada. Assine um plano pago primeiro.",
@@ -68,10 +98,8 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const stripe = getStripe();
-    const siteUrl = getSiteUrl();
     const session = await stripe.billingPortal.sessions.create({
-      customer: empresa.stripe_customer_id as string,
+      customer: customerId,
       return_url: `${siteUrl}/dashboard/assinatura`,
     });
 
