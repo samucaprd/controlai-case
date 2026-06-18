@@ -27,6 +27,7 @@ import type { TenantUser } from "@/features/auth/mock-tenant-users";
 import type { AppRole } from "@/features/auth/types";
 import { toast } from "sonner";
 import { isSupabaseConfigured } from "@/lib/supabase/is-configured";
+import { SessionExpiredError } from "@/lib/supabase/ensure-active-session";
 
 interface UsuarioFormDialogProps {
   open: boolean;
@@ -106,7 +107,11 @@ export function UsuarioFormDialog({
       onOpenChange(false);
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : "Não foi possível salvar o usuário.",
+        err instanceof SessionExpiredError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : "Não foi possível salvar o usuário.",
       );
     } finally {
       setSaving(false);

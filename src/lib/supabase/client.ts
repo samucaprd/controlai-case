@@ -19,7 +19,7 @@ export function getSupabase(): SupabaseClient<Database> {
         auth: {
           persistSession: true,
           autoRefreshToken: true,
-          detectSessionInUrl: true,
+          detectSessionInUrl: false,
         },
       },
     );

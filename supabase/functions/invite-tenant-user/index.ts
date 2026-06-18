@@ -3,6 +3,7 @@ import { createClient, type SupabaseClient } from "jsr:@supabase/supabase-js@2";
 import { sendBrevoEmail, getSiteUrl } from "../_shared/brevo.ts";
 import { userInviteEmail } from "../_shared/email-templates.ts";
 import { corsHeaders, jsonResponse } from "../_shared/cors.ts";
+import { findAuthUserIdByEmail } from "../_shared/auth-user-lookup.ts";
 
 interface InviteBody {
   email?: string;
@@ -20,6 +21,56 @@ function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
+function formatGenerateLinkError(message: string, siteUrl: string): string {
+  const lower = message.toLowerCase();
+  if (
+    lower.includes("already been registered") ||
+    lower.includes("already registered") ||
+    lower.includes("user already registered")
+  ) {
+    return "Este e-mail já possui conta no sistema. O convite será reenviado se o colaborador ainda não tiver entrado.";
+  }
+  if (lower.includes("redirect") || lower.includes("url")) {
+    return `${message} Adicione ${siteUrl}/auth/accept-invite nas Redirect URLs do Supabase Auth.`;
+  }
+  return message;
+}
+
+async function generateInviteActionLink(
+  adminClient: SupabaseClient,
+  email: string,
+  siteUrl: string,
+): Promise<string> {
+  const redirectTo = `${siteUrl}/auth/accept-invite`;
+
+  // Após createUser (ou reenvio) o usuário já existe no Auth — use recovery, não invite.
+  const { data: recoveryData, error: recoveryError } =
+    await adminClient.auth.admin.generateLink({
+      type: "recovery",
+      email,
+      options: { redirectTo },
+    });
+
+  if (recoveryData?.properties?.action_link) {
+    return recoveryData.properties.action_link;
+  }
+
+  const { data: inviteData, error: inviteError } =
+    await adminClient.auth.admin.generateLink({
+      type: "invite",
+      email,
+      options: { redirectTo },
+    });
+
+  if (inviteData?.properties?.action_link) {
+    return inviteData.properties.action_link;
+  }
+
+  const detail =
+    recoveryError?.message ?? inviteError?.message ?? "Falha ao gerar link de convite";
+  throw new Error(formatGenerateLinkError(detail, siteUrl));
+}
+
 async function sendInviteEmail(params: {
   adminClient: SupabaseClient;
   email: string;
@@ -28,25 +79,17 @@ async function sendInviteEmail(params: {
   convidadoPor?: string;
 }): Promise<{ sent: boolean; warning?: string; actionLink?: string }> {
   const siteUrl = getSiteUrl();
-
-  const { data: linkData, error: linkError } =
-    await params.adminClient.auth.admin.generateLink({
-      type: "invite",
-      email: params.email,
-      options: {
-        redirectTo: `${siteUrl}/auth/accept-invite`,
-      },
-    });
-
-  if (linkError || !linkData?.properties?.action_link) {
-    throw new Error(linkError?.message ?? "Falha ao gerar link de convite");
-  }
+  const actionLink = await generateInviteActionLink(
+    params.adminClient,
+    params.email,
+    siteUrl,
+  );
 
   const template = userInviteEmail({
     nome: params.nomeCompleto,
     empresaNome: params.empresaNome,
     convidadoPor: params.convidadoPor,
-    actionLink: linkData.properties.action_link,
+    actionLink: actionLink,
   });
 
   const emailResult = await sendBrevoEmail({
@@ -63,7 +106,7 @@ async function sendInviteEmail(params: {
   return {
     sent: emailResult.sent,
     warning: emailResult.warning ?? undefined,
-    actionLink: linkData.properties.action_link,
+    actionLink,
   };
 }
 
@@ -118,22 +161,48 @@ async function cleanupOrphanAuthUser(
   adminClient: SupabaseClient,
   email: string,
 ): Promise<void> {
-  const { data: authUserId, error } = await adminClient.rpc(
-    "auth_user_id_by_email",
-    { p_email: email },
-  );
+  try {
+    const authUserId = await findAuthUserIdByEmail(adminClient, email);
+    if (!authUserId) return;
 
-  if (error || !authUserId) return;
+    const { data: linkedPerfil } = await adminClient
+      .from("perfis")
+      .select("id")
+      .eq("id", authUserId)
+      .maybeSingle();
 
-  const { data: linkedPerfil } = await adminClient
-    .from("perfis")
-    .select("id")
-    .eq("id", authUserId as string)
-    .maybeSingle();
-
-  if (!linkedPerfil) {
-    await adminClient.auth.admin.deleteUser(authUserId as string);
+    if (!linkedPerfil) {
+      const { error } = await adminClient.auth.admin.deleteUser(authUserId);
+      if (error) {
+        console.warn("[invite] orphan cleanup deleteUser:", error.message);
+      }
+    }
+  } catch (err) {
+    console.warn("[invite] orphan cleanup skipped:", err);
   }
+}
+
+function mapCreateUserError(message: string): { status: number; body: Record<string, unknown> } | null {
+  const lower = message.toLowerCase();
+  if (lower.includes("limite de usuários") || lower.includes("user limit")) {
+    return {
+      status: 429,
+      body: {
+        error: message,
+        code: "USER_LIMIT_REACHED",
+      },
+    };
+  }
+  if (lower.includes("e-mail já") || lower.includes("email já")) {
+    return {
+      status: 409,
+      body: {
+        error: "Este e-mail já está cadastrado na plataforma.",
+        code: "EMAIL_EXISTS",
+      },
+    };
+  }
+  return null;
 }
 
 Deno.serve(async (req: Request) => {
@@ -263,9 +332,12 @@ Deno.serve(async (req: Request) => {
         email,
         nomeCompleto,
         role,
-        empresaId: callerPerfil.empresa_id,
+        empresaId: callerPerfil.empresa_id as number,
         empresaNome,
         convidadoPor: callerPerfil.nome_completo?.trim() || undefined,
+      }).catch((err) => {
+        const msg = err instanceof Error ? err.message : "Falha ao reenviar convite";
+        return jsonResponse({ error: msg, code: "INVITE_SEND_FAILED" }, 500);
       });
     }
 
@@ -307,6 +379,11 @@ Deno.serve(async (req: Request) => {
       });
 
     if (createError) {
+      const mapped = mapCreateUserError(createError.message);
+      if (mapped) {
+        return jsonResponse(mapped.body, mapped.status);
+      }
+
       const message = createError.message.toLowerCase();
       if (
         message.includes("already") ||

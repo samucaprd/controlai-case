@@ -54,7 +54,6 @@ export default function AcceptInvite() {
       const query = new URLSearchParams(window.location.search);
       const tokenHash = query.get("token_hash");
       const type = query.get("type");
-      const isRecovery = type === "recovery";
 
       if (
         tokenHash &&
@@ -89,7 +88,9 @@ export default function AcceptInvite() {
         const invited =
           user.user_metadata?.invited === true ||
           user.user_metadata?.invited === "true";
-        setIsInviteFlow(!isRecovery && (invited || type === "invite" || type === "signup"));
+        setIsInviteFlow(
+          invited || type === "invite" || type === "signup",
+        );
 
         let suggested = readSuggestedName(
           user.user_metadata as Record<string, unknown>,

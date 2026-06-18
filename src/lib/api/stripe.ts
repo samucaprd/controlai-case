@@ -114,6 +114,7 @@ export async function syncCheckoutSession(
 ): Promise<SyncCheckoutResult> {
   return invokeStripeFunction<SyncCheckoutResult>("sync-checkout-session", {
     session_id: sessionId,
+    stripe_session: sessionId,
   });
 }
 

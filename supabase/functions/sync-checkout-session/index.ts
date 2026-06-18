@@ -6,6 +6,7 @@ import { applyStripeSubscription } from "../_shared/subscription-sync.ts";
 
 interface SyncBody {
   session_id?: string;
+  stripe_session?: string;
 }
 
 Deno.serve(async (req: Request) => {
@@ -41,7 +42,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const body = (await req.json()) as SyncBody;
-    const sessionId = body.session_id?.trim();
+    const sessionId = (body.stripe_session ?? body.session_id)?.trim();
     if (!sessionId) {
       return jsonResponse({ error: "session_id é obrigatório" }, 400);
     }

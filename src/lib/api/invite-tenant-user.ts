@@ -1,5 +1,6 @@
 import { getSupabase } from "@/lib/supabase/client";
 import type { AppRole } from "@/features/auth/types";
+import { ensureActiveSession } from "@/lib/supabase/ensure-active-session";
 import { FunctionsHttpError } from "@supabase/supabase-js";
 
 export interface InviteTenantUserInput {
@@ -44,6 +45,8 @@ export interface InviteTenantUserResult {
 export async function inviteTenantUser(
   input: InviteTenantUserInput,
 ): Promise<InviteTenantUserResult> {
+  await ensureActiveSession();
+
   const supabase = getSupabase();
 
   const { data, error } = await supabase.functions.invoke("invite-tenant-user", {

@@ -11,6 +11,7 @@ import type { SessionUser } from "./types";
 import { SESSION_STORAGE_KEY } from "./types";
 import { isSupabaseConfigured } from "@/lib/supabase/is-configured";
 import { getSupabase } from "@/lib/supabase/client";
+import { clearInvalidAuthStorage } from "@/lib/supabase/ensure-active-session";
 import { fetchProfileForUser } from "@/lib/supabase/fetch-profile";
 import { mapPerfilToSessionUser } from "@/lib/supabase/map-session";
 
@@ -93,8 +94,40 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     let mounted = true;
     const supabase = getSupabase();
 
-    const syncFromAuthUser = async (userId: string | undefined) => {
-      if (!userId) {
+    const syncFromAuthUser = async (userId: string) => {
+      try {
+        const { perfil, empresa } = await fetchProfileForUser(userId);
+        if (mounted) {
+          setUser(mapPerfilToSessionUser(perfil, empresa));
+        }
+      } catch (err) {
+        console.error("[session] falha ao carregar perfil:", err);
+        try {
+          await new Promise((resolve) => setTimeout(resolve, 400));
+          const { perfil, empresa } = await fetchProfileForUser(userId);
+          if (mounted) {
+            setUser(mapPerfilToSessionUser(perfil, empresa));
+          }
+        } catch (retryErr) {
+          console.error("[session] retry perfil falhou:", retryErr);
+          const { data: authData } = await supabase.auth.getUser();
+          if (!authData.user?.id && mounted) {
+            setUser(loggedOutSession);
+          }
+        }
+      } finally {
+        if (mounted) setIsLoading(false);
+      }
+    };
+
+    void (async () => {
+      await clearInvalidAuthStorage();
+
+      const { data, error } = await supabase.auth.getSession();
+      if (!mounted) return;
+
+      if (error) {
+        console.error("[session] getSession:", error.message);
         if (mounted) {
           setUser(loggedOutSession);
           setIsLoading(false);
@@ -102,28 +135,29 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      try {
-        const { perfil, empresa } = await fetchProfileForUser(userId);
-        if (mounted) {
-          setUser(mapPerfilToSessionUser(perfil, empresa));
-        }
-      } catch {
-        if (mounted) setUser(loggedOutSession);
-      } finally {
-        if (mounted) setIsLoading(false);
+      if (!data.session?.user?.id) {
+        setUser(loggedOutSession);
+        setIsLoading(false);
+        return;
       }
-    };
 
-    void (async () => {
-      const { data } = await supabase.auth.getSession();
-      if (!mounted) return;
-      await syncFromAuthUser(data.session?.user?.id);
+      await syncFromAuthUser(data.session.user.id);
     })();
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      void syncFromAuthUser(session?.user?.id);
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_OUT") {
+        if (mounted) {
+          setUser(loggedOutSession);
+          setIsLoading(false);
+        }
+        return;
+      }
+
+      if (session?.user?.id) {
+        void syncFromAuthUser(session.user.id);
+      }
     });
 
     return () => {
