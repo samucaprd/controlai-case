@@ -36,9 +36,14 @@ async function parseFunctionError(
   return { message: error.message };
 }
 
+export interface InviteTenantUserResult {
+  message: string;
+  resent: boolean;
+}
+
 export async function inviteTenantUser(
   input: InviteTenantUserInput,
-): Promise<void> {
+): Promise<InviteTenantUserResult> {
   const supabase = getSupabase();
 
   const { data, error } = await supabase.functions.invoke("invite-tenant-user", {
@@ -63,6 +68,8 @@ export async function inviteTenantUser(
     error?: string;
     code?: string;
     success?: boolean;
+    message?: string;
+    resent?: boolean;
   } | null;
 
   if (payload?.error) {
@@ -72,4 +79,9 @@ export async function inviteTenantUser(
   if (!payload?.success) {
     throw new InviteUserError("Resposta inesperada ao convidar usuário.");
   }
+
+  return {
+    message: payload.message ?? "Convite enviado por e-mail.",
+    resent: payload.resent ?? false,
+  };
 }

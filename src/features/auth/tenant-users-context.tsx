@@ -14,7 +14,7 @@ import { useSession } from "./session-context";
 import type { AppRole } from "./types";
 import { deleteTenantUser } from "@/lib/api/delete-tenant-user";
 import { logAudit } from "@/lib/audit/log-audit";
-import { inviteTenantUser, InviteUserError } from "@/lib/api/invite-tenant-user";
+import { inviteTenantUser, InviteUserError, type InviteTenantUserResult } from "@/lib/api/invite-tenant-user";
 import { getSupabase } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/is-configured";
 
@@ -130,7 +130,7 @@ interface TenantUsersContextValue {
   users: TenantUser[];
   isLoading: boolean;
   updateUser: (id: string, patch: Partial<TenantUser>) => Promise<void>;
-  addUser: (input: TenantUserFormInput) => Promise<void>;
+  addUser: (input: TenantUserFormInput) => Promise<InviteTenantUserResult | void>;
   saveUser: (id: string, input: TenantUserFormInput) => Promise<void>;
   removeUser: (
     id: string,
@@ -230,7 +230,7 @@ export function TenantUsersProvider({ children }: { children: ReactNode }) {
           throw new InviteUserError("Papel inválido para convite.");
         }
 
-        await inviteTenantUser({
+        const result = await inviteTenantUser({
           email: input.email,
           nome_completo: input.nome,
           role: input.role,
@@ -239,10 +239,10 @@ export function TenantUsersProvider({ children }: { children: ReactNode }) {
           acao: "usuario_convidado",
           entidade_tipo: "perfil",
           empresa_id: empresaIdNumeric,
-          detalhes: { email: input.email, role: input.role },
+          detalhes: { email: input.email, role: input.role, resent: result.resent },
         });
         await fetchFromSupabase();
-        return;
+        return result;
       }
 
       const novo: TenantUser = {

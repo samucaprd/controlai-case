@@ -114,10 +114,10 @@ export function AdminUsuariosTab() {
     status: "ativo" | "inativo";
   }) => {
     if (dialogMode === "create") {
-      await addUser(data);
+      const result = await addUser(data);
       toast.success(
         useSupabase
-          ? "Convite enviado por e-mail."
+          ? (result?.message ?? "Convite enviado por e-mail.")
           : "Usuário adicionado (modo demonstração).",
       );
     } else if (editingUser) {
