@@ -7,7 +7,6 @@ import {
   ExternalLink,
   Loader2,
   Sparkles,
-  XCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -111,6 +110,21 @@ function isPlanoMaster(plano: { nome: string }): boolean {
 
 function isPlanoFree(plano: { nome: string }): boolean {
   return plano.nome === "Free";
+}
+
+const CANCELLABLE_PLAN_NAMES = new Set(["Básico", "Empresa"]);
+
+function isCancellablePaidPlan(planoNome: string): boolean {
+  return CANCELLABLE_PLAN_NAMES.has(planoNome);
+}
+
+function formatDateNumeric(iso: string | null): string {
+  if (!iso) return "—";
+  return new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(new Date(iso));
 }
 
 function planPriceLabel(plano: { nome: string; preco_mensal: number }): string {
@@ -339,10 +353,15 @@ export function GerenciarAssinaturaContent({
   const hasSubscription = Boolean(info.stripeSubscriptionId);
   const tenantOnMasterPlan = info.planoNome === "Master";
   const isPaidPlan = info.precoMensal > 0 && !tenantOnMasterPlan;
+  const isCancellablePlan = isCancellablePaidPlan(info.planoNome);
   const hasPendingCancel = Boolean(info.subscriptionCancelAt);
   const canOpenPortal = !tenantOnMasterPlan && (hasStripe || hasSubscription);
-  const canManagePaidSubscription =
-    canManageBilling && isPaidPlan && hasSubscription && !tenantOnMasterPlan;
+  const canShowCancelSubscription =
+    canManageBilling &&
+    isCancellablePlan &&
+    hasSubscription &&
+    !tenantOnMasterPlan &&
+    !hasPendingCancel;
   const currentResources = currentPlanResourceLines(info);
   const billablePlanos = [...availablePlanos]
     .filter((plano) => !isPlanoMaster(plano))
@@ -382,6 +401,42 @@ export function GerenciarAssinaturaContent({
               O plano Master é atribuído apenas pela equipe da plataforma. Alterações de
               assinatura e cobrança não se aplicam a este tenant.
             </p>
+          )}
+
+          {hasPendingCancel && (
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-sm">
+              <p className="text-foreground">
+                Sua assinatura foi cancelada e permanecerá ativa até{" "}
+                <strong>{formatDateNumeric(info.subscriptionCancelAt)}</strong>.
+              </p>
+              {canManageBilling && isCancellablePlan && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-3"
+                  disabled={subscriptionLoading}
+                  onClick={() => void runSubscriptionAction("reactivate")}
+                >
+                  {subscriptionLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    "Manter assinatura"
+                  )}
+                </Button>
+              )}
+            </div>
+          )}
+
+          {canShowCancelSubscription && (
+            <div>
+              <Button
+                variant="outline"
+                disabled={subscriptionLoading}
+                onClick={() => setSubscriptionAction("cancel")}
+              >
+                Cancelar assinatura
+              </Button>
+            </div>
           )}
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -425,73 +480,6 @@ export function GerenciarAssinaturaContent({
           </div>
         </CardContent>
       </Card>
-
-      {canManageBilling && isPaidPlan && (
-        <Card className="border-border">
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <XCircle className="h-4 w-4 text-muted-foreground" />
-              Cancelar ou alterar plano
-            </CardTitle>
-            <CardDescription>
-              Cancele a assinatura, volte ao plano Free ou mude para outro plano na grade abaixo.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {hasPendingCancel && (
-              <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-sm">
-                <p className="font-medium text-amber-800 dark:text-amber-200">
-                  Cancelamento agendado
-                </p>
-                <p className="text-muted-foreground mt-1">
-                  Você mantém o acesso até{" "}
-                  <strong>{formatDate(info.subscriptionCancelAt)}</strong>. Depois disso, sua
-                  empresa volta automaticamente ao plano Free.
-                </p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-3"
-                  disabled={subscriptionLoading}
-                  onClick={() => void runSubscriptionAction("reactivate")}
-                >
-                  {subscriptionLoading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    "Manter assinatura"
-                  )}
-                </Button>
-              </div>
-            )}
-
-            {canManagePaidSubscription && !hasPendingCancel && (
-              <div className="flex flex-wrap gap-3">
-                <Button
-                  variant="outline"
-                  disabled={subscriptionLoading}
-                  onClick={() => setSubscriptionAction("cancel")}
-                >
-                  Cancelar assinatura
-                </Button>
-                <Button
-                  variant="ghost"
-                  disabled={subscriptionLoading}
-                  onClick={() => setSubscriptionAction("downgrade_free")}
-                >
-                  Voltar para Free agora
-                </Button>
-              </div>
-            )}
-
-            {!hasSubscription && isPaidPlan && (
-              <p className="text-sm text-muted-foreground">
-                Sua empresa está no plano {info.planoNome}, mas não há assinatura Stripe ativa
-                vinculada. Use a grade de planos abaixo ou o portal de cobrança para regularizar.
-              </p>
-            )}
-          </CardContent>
-        </Card>
-      )}
 
       {canManageBilling && !tenantOnMasterPlan && (
         <Card className="border-border">
@@ -597,12 +585,12 @@ export function GerenciarAssinaturaContent({
           <AlertDialogHeader>
             <AlertDialogTitle>
               {subscriptionAction === "cancel"
-                ? "Cancelar assinatura?"
+                ? "Cancelar assinatura"
                 : "Voltar para o plano Free?"}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {subscriptionAction === "cancel"
-                ? "O cancelamento será agendado para o fim do período já pago. Até lá você continua com os recursos do plano atual e depois volta ao Free automaticamente."
+                ? "Tem certeza que deseja cancelar sua assinatura? Seu plano continuará ativo até o final do período já pago e depois será migrado automaticamente para o plano Free."
                 : "A assinatura será encerrada imediatamente e sua empresa passará para o plano Free. Os limites do Free passam a valer na hora."}
             </AlertDialogDescription>
           </AlertDialogHeader>
