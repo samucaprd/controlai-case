@@ -3,6 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { AuditLogEntry } from "@/features/master/use-master-audit";
+import { formatActivityLabel, formatEntityTipo } from "@/features/dashboard/format";
 
 interface MasterAuditoriaTabProps {
   logs: AuditLogEntry[];
@@ -19,25 +20,6 @@ function formatDateTime(iso: string): string {
     hour: "2-digit",
     minute: "2-digit",
   }).format(new Date(iso));
-}
-
-function acaoLabel(acao: string): string {
-  const labels: Record<string, string> = {
-    empresa_criada: "Empresa criada",
-    empresa_atualizada: "Empresa atualizada",
-    empresa_excluida: "Empresa excluída",
-    plano_criado: "Plano criado",
-    plano_atualizado: "Plano atualizado",
-    plano_excluido: "Plano excluído",
-    plano_toggle: "Plano ativado/desativado",
-    usuario_convidado: "Usuário convidado",
-    usuario_atualizado: "Usuário atualizado",
-    usuario_excluido: "Usuário excluído",
-    byok_cadastrada: "BYOK cadastrada",
-    byok_rotacionada: "BYOK rotacionada",
-    byok_removida: "BYOK removida",
-  };
-  return labels[acao] ?? acao;
 }
 
 export function MasterAuditoriaTab({
@@ -104,11 +86,11 @@ export function MasterAuditoriaTab({
                     </td>
                     <td className="p-3">
                       <Badge variant="outline" className="font-normal">
-                        {acaoLabel(log.acao)}
+                        {formatActivityLabel(log.acao, log.entidade_tipo)}
                       </Badge>
                     </td>
                     <td className="p-3 text-muted-foreground">
-                      {log.entidade_tipo}
+                      {formatEntityTipo(log.entidade_tipo)}
                       {log.entidade_id != null && (
                         <span className="text-foreground"> #{log.entidade_id}</span>
                       )}
