@@ -3,7 +3,7 @@ import { CreditCard, Key, Users } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { RoleGate } from "@/features/auth/role-gate";
 import { AdminUsuariosTab } from "@/components/admin/admin-usuarios-tab";
-import { MasterUsuariosPlataformaTab } from "@/components/admin/master-usuarios-plataforma-tab";
+import { AdminUsuariosMasterSection } from "@/components/admin/admin-usuarios-master-section";
 import { AdminAssinaturaTab } from "@/components/admin/admin-assinatura-tab";
 import { AdminByokTab } from "@/components/admin/admin-byok-tab";
 import { useTenantSubscription } from "@/features/admin/use-tenant-subscription";
@@ -50,7 +50,7 @@ function AdminContent() {
         </TabsList>
 
         <TabsContent value="usuarios">
-          {isMaster ? <MasterUsuariosPlataformaTab /> : <AdminUsuariosTab />}
+          {isMaster ? <AdminUsuariosMasterSection /> : <AdminUsuariosTab />}
         </TabsContent>
 
         <TabsContent value="assinatura">

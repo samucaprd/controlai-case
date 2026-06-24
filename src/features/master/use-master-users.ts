@@ -2,8 +2,15 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import type { AppRole } from "@/features/auth/types";
+import { logAudit } from "@/lib/audit/log-audit";
 import { getSupabase } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/is-configured";
+
+export const MASTER_ASSIGNABLE_ROLES: { value: AppRole; label: string }[] = [
+  { value: "master", label: "Master" },
+  { value: "admin", label: "Admin" },
+  { value: "user", label: "Colaborador" },
+];
 
 export interface MasterPlatformUser {
   id: string;
@@ -130,8 +137,52 @@ export function useMasterUsers() {
     };
   }, [users]);
 
+  const updateUser = useCallback(
+    async (
+      id: string,
+      patch: { nome?: string; role?: AppRole; status?: "ativo" | "inativo" },
+      previous: MasterPlatformUser,
+    ) => {
+      if (!useSupabase) return;
+
+      const supabase = getSupabase();
+      const dbPatch: Record<string, unknown> = {};
+      if (patch.nome !== undefined) dbPatch.nome_completo = patch.nome;
+      if (patch.role !== undefined) dbPatch.role = patch.role;
+      if (patch.status !== undefined) dbPatch.status = patch.status;
+
+      const { error } = await supabase.from("perfis").update(dbPatch).eq("id", id);
+      if (error) throw error;
+
+      await logAudit({
+        acao: "master_usuario_atualizado",
+        entidade_tipo: "perfil",
+        empresa_id: previous.empresaId,
+        detalhes: {
+          user_id: id,
+          email: previous.email,
+          empresa_nome: previous.empresaNome,
+          antes: {
+            nome: previous.nome,
+            role: previous.role,
+            status: previous.status,
+          },
+          depois: {
+            nome: patch.nome ?? previous.nome,
+            role: patch.role ?? previous.role,
+            status: patch.status ?? previous.status,
+          },
+        },
+      });
+
+      await fetchUsers();
+    },
+    [useSupabase, fetchUsers],
+  );
+
   return {
     users: filteredUsers,
+    allUsers: users,
     stats,
     empresasOptions,
     isLoading,
@@ -144,6 +195,7 @@ export function useMasterUsers() {
     statusFilter,
     setStatusFilter,
     refresh: fetchUsers,
+    updateUser,
     useSupabase,
   };
 }

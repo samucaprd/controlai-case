@@ -4,6 +4,7 @@ import { MasterStatsSection } from "@/components/master/master-stats-section";
 import { MasterGerenciarClientesTab } from "@/components/master/master-gerenciar-clientes-tab";
 import { MasterGerenciarPlanosTab } from "@/components/master/master-gerenciar-planos-tab";
 import { MasterAuditoriaTab } from "@/components/master/master-auditoria-tab";
+import { MasterUsuariosPlataformaTab } from "@/components/admin/master-usuarios-plataforma-tab";
 import { useMasterPlatform } from "@/features/master/use-master-platform";
 import { useMasterAudit } from "@/features/master/use-master-audit";
 import { cn } from "@/lib/utils";
@@ -61,8 +62,8 @@ function MasterContent() {
       <Tabs defaultValue="clientes" className="space-y-6">
         <TabsList
           className={cn(
-            "inline-flex h-auto w-full max-w-2xl rounded-full bg-muted/60 p-1",
-            "grid grid-cols-3",
+            "inline-flex h-auto w-full max-w-3xl rounded-full bg-muted/60 p-1",
+            "grid grid-cols-2 sm:grid-cols-4",
           )}
         >
           <TabsTrigger
@@ -84,6 +85,16 @@ function MasterContent() {
             )}
           >
             Gerenciar Planos
+          </TabsTrigger>
+          <TabsTrigger
+            value="usuarios"
+            className={cn(
+              "rounded-full px-4 py-2.5 text-sm font-medium transition-all",
+              "data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-sm",
+              "data-[state=inactive]:text-muted-foreground",
+            )}
+          >
+            Usuários
           </TabsTrigger>
           <TabsTrigger
             value="auditoria"
@@ -140,6 +151,13 @@ function MasterContent() {
               void refreshAudit();
             }}
             onSyncAllStripe={syncAllPlanosStripe}
+          />
+        </TabsContent>
+
+        <TabsContent value="usuarios" className="mt-0 focus-visible:outline-none">
+          <MasterUsuariosPlataformaTab
+            canManage
+            onUserUpdated={() => void refreshAudit()}
           />
         </TabsContent>
 
