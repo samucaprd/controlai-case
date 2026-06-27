@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { logAudit } from "@/lib/audit/log-audit";
 import { archiveStripePlan, syncStripePlan } from "@/lib/api/stripe";
 import { getSupabase } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/is-configured";
@@ -203,13 +202,6 @@ export function useMasterPlatform() {
         .select("id")
         .single();
       if (error) throw error;
-      await logAudit({
-        acao: "empresa_criada",
-        entidade_tipo: "empresa",
-        entidade_id: data.id as number,
-        empresa_id: data.id as number,
-        detalhes: { nome: input.nome },
-      });
       await fetchData();
     },
     [fetchData],
@@ -230,13 +222,6 @@ export function useMasterPlatform() {
         })
         .eq("id", id);
       if (error) throw error;
-      await logAudit({
-        acao: "empresa_atualizada",
-        entidade_tipo: "empresa",
-        entidade_id: id,
-        empresa_id: id,
-        detalhes: { nome: input.nome, status: input.status },
-      });
       await fetchData();
     },
     [fetchData],
@@ -247,12 +232,6 @@ export function useMasterPlatform() {
       const supabase = getSupabase();
       const { error } = await supabase.from("empresas").delete().eq("id", id);
       if (error) throw error;
-      await logAudit({
-        acao: "empresa_excluida",
-        entidade_tipo: "empresa",
-        entidade_id: id,
-        empresa_id: id,
-      });
       await fetchData();
     },
     [fetchData],
@@ -285,12 +264,6 @@ export function useMasterPlatform() {
         is_active: input.is_active,
       });
 
-      await logAudit({
-        acao: "plano_criado",
-        entidade_tipo: "plano",
-        entidade_id: data.id as number,
-        detalhes: { nome: input.nome },
-      });
       await fetchData();
     },
     [fetchData],
@@ -325,12 +298,6 @@ export function useMasterPlatform() {
         })
         .eq("id", id);
       if (error) throw error;
-      await logAudit({
-        acao: "plano_atualizado",
-        entidade_tipo: "plano",
-        entidade_id: id,
-        detalhes: { nome: input.nome },
-      });
       await fetchData();
     },
     [fetchData, planos],
@@ -346,11 +313,6 @@ export function useMasterPlatform() {
       const supabase = getSupabase();
       const { error } = await supabase.from("planos").delete().eq("id", id);
       if (error) throw error;
-      await logAudit({
-        acao: "plano_excluido",
-        entidade_tipo: "plano",
-        entidade_id: id,
-      });
       await fetchData();
     },
     [fetchData],
@@ -375,12 +337,6 @@ export function useMasterPlatform() {
         .update({ is_active: isActive })
         .eq("id", id);
       if (error) throw error;
-      await logAudit({
-        acao: "plano_toggle",
-        entidade_tipo: "plano",
-        entidade_id: id,
-        detalhes: { is_active: isActive },
-      });
       await fetchData();
     },
     [fetchData, planos],

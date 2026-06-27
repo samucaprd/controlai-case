@@ -1,5 +1,5 @@
 export interface DashboardActivityItem {
-  id: number;
+  id: string;
   acao: string;
   label: string;
   empresaNome: string | null;

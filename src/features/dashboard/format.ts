@@ -31,6 +31,11 @@ const DB_OP_LABELS: Record<string, { insert: string; update: string; delete: str
     update: "Agente IA atualizado",
     delete: "Agente IA excluído",
   },
+  planos: {
+    insert: "Plano criado",
+    update: "Plano atualizado",
+    delete: "Plano excluído",
+  },
 };
 
 const ENTITY_TYPE_LABELS: Record<string, string> = {
@@ -38,6 +43,8 @@ const ENTITY_TYPE_LABELS: Record<string, string> = {
   empresas: "Empresa",
   agentes_ia: "Agente IA",
   planos: "Plano",
+  plano: "Plano",
+  empresa: "Empresa",
   perfil: "Usuário",
 };
 

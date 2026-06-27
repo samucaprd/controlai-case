@@ -1,11 +1,12 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CreditCard, Key, Users } from "lucide-react";
+import { CreditCard, FileText, Key, Users } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { RoleGate } from "@/features/auth/role-gate";
 import { AdminUsuariosTab } from "@/components/admin/admin-usuarios-tab";
 import { AdminUsuariosMasterSection } from "@/components/admin/admin-usuarios-master-section";
 import { AdminAssinaturaTab } from "@/components/admin/admin-assinatura-tab";
 import { AdminByokTab } from "@/components/admin/admin-byok-tab";
+import { AdminLogsTab } from "@/components/admin/admin-logs-tab";
 import { useTenantSubscription } from "@/features/admin/use-tenant-subscription";
 import { useSession } from "@/features/auth/session-context";
 
@@ -16,7 +17,10 @@ function AdminContent() {
   const [searchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
   const defaultTab =
-    tabParam === "assinatura" || tabParam === "api" || tabParam === "usuarios"
+    tabParam === "assinatura" ||
+    tabParam === "api" ||
+    tabParam === "usuarios" ||
+    tabParam === "logs"
       ? tabParam
       : "usuarios";
 
@@ -47,6 +51,10 @@ function AdminContent() {
             <Key className="mr-2 h-4 w-4" />
             API & BYOK
           </TabsTrigger>
+          <TabsTrigger value="logs">
+            <FileText className="mr-2 h-4 w-4" />
+            Logs
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="usuarios">
@@ -59,6 +67,10 @@ function AdminContent() {
 
         <TabsContent value="api">
           <AdminByokTab info={info} isLoading={isLoading} onRefresh={refresh} />
+        </TabsContent>
+
+        <TabsContent value="logs">
+          <AdminLogsTab />
         </TabsContent>
       </Tabs>
     </div>

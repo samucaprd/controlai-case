@@ -1,9 +1,13 @@
-import { useCallback, useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { parseMensagens } from "@/lib/api/conversas";
+import { fetchAuditLogs } from "@/lib/api/audit-logs";
 import { getSupabase } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/is-configured";
+import { CACHE_TIMES } from "@/lib/query/query-client";
+import { queryKeys } from "@/lib/query/cache-keys";
 import { useSession } from "@/features/auth/session-context";
 import { formatActivityLabel } from "./format";
+import type { AuditLogEntry } from "@/features/audit/types";
 import type { DashboardActivityItem, DashboardStats, DashboardSystemStatusItem } from "./types";
 
 const SUCCESS_SAMPLE_LIMIT = 500;
@@ -26,23 +30,15 @@ function computeSuccessRate(rows: { mensagens: unknown }[]): number {
   return Math.round((successful / withUser.length) * 100);
 }
 
-function mapActivityRows(
-  rows: Record<string, unknown>[],
-): DashboardActivityItem[] {
-  return rows.map((row) => {
-    const perfil = row.perfis as Record<string, unknown> | null;
-    const empresa = row.empresas as Record<string, unknown> | null;
-    const acao = row.acao as string;
-    const entidadeTipo = (row.entidade_tipo as string) ?? null;
-    return {
-      id: row.id as number,
-      acao,
-      label: formatActivityLabel(acao, entidadeTipo),
-      empresaNome: (empresa?.nome as string) ?? null,
-      userNome: (perfil?.nome_completo as string) ?? null,
-      createdAt: row.created_at as string,
-    };
-  });
+function mapAuditToActivity(logs: AuditLogEntry[]): DashboardActivityItem[] {
+  return logs.map((log) => ({
+    id: log.id,
+    acao: log.acao,
+    label: formatActivityLabel(log.acao, log.tabela),
+    empresaNome: log.empresaNome,
+    userNome: log.userNome,
+    createdAt: log.createdAt,
+  }));
 }
 
 function buildTenantSystemStatus(input: {
@@ -142,176 +138,158 @@ function buildPlatformSystemStatus(input: {
 export function useDashboardStats() {
   const { user, isMaster } = useSession();
   const useSupabase = isSupabaseConfigured();
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [isLoading, setIsLoading] = useState(useSupabase);
 
-  const fetchStats = useCallback(async () => {
-    if (!useSupabase || !user.empresaId) {
-      setIsLoading(false);
-      return;
-    }
+  const query = useQuery({
+    queryKey: queryKeys.dashboardStats(
+      isMaster ? "platform" : "tenant",
+      user.empresaId,
+    ),
+    queryFn: () => loadDashboardStats(isMaster, user),
+    enabled: useSupabase && Boolean(user.empresaId),
+    staleTime: CACHE_TIMES.dashboard.staleTime,
+    gcTime: CACHE_TIMES.dashboard.gcTime,
+  });
 
-    setIsLoading(true);
-    try {
-      const supabase = getSupabase();
-      const empresaId = Number(user.empresaId);
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      const sinceIso = thirtyDaysAgo.toISOString();
+  return {
+    stats: query.data ?? null,
+    isLoading: query.isLoading,
+    refresh: query.refetch,
+    useSupabase,
+  };
+}
 
-      if (isMaster) {
-        const [
-          perfisRes,
-          perfisAtivosRes,
-          conversasRes,
-          conversasSampleRes,
-          conversasRecentRes,
-          empresasRes,
-          byokRes,
-          auditRes,
-        ] = await Promise.all([
-          supabase.from("perfis").select("id", { count: "exact", head: true }),
-          supabase
-            .from("perfis")
-            .select("id", { count: "exact", head: true })
-            .eq("status", "ativo"),
-          supabase.from("conversas").select("id", { count: "exact", head: true }),
-          supabase
-            .from("conversas")
-            .select("mensagens")
-            .order("updated_at", { ascending: false })
-            .limit(SUCCESS_SAMPLE_LIMIT),
-          supabase
-            .from("conversas")
-            .select("id", { count: "exact", head: true })
-            .gte("updated_at", sinceIso),
-          supabase.from("empresas").select("id, status, is_active, chave_api_llm"),
-          supabase
-            .from("empresas")
-            .select("id", { count: "exact", head: true })
-            .not("chave_api_llm", "is", null),
-          supabase
-            .from("auditoria")
-            .select(
-              "id, acao, entidade_tipo, created_at, perfis(nome_completo), empresas(nome)",
-            )
-            .order("created_at", { ascending: false })
-            .limit(RECENT_ACTIVITY_LIMIT),
-        ]);
+async function loadDashboardStats(
+  isMaster: boolean,
+  user: { empresaId: string; empresaNome: string },
+): Promise<DashboardStats> {
+  const supabase = getSupabase();
+  const empresaId = Number(user.empresaId);
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const sinceIso = thirtyDaysAgo.toISOString();
 
-        const empresas = empresasRes.data ?? [];
-        const empresasTotal = empresas.length;
-        const empresasAtivas = empresas.filter(
-          (e) => e.is_active && e.status === "ativa",
-        ).length;
-        const empresasSuspensas = empresas.filter((e) => e.status === "suspensa").length;
-        const uptimePercent =
-          empresasTotal > 0 ? Math.round((empresasAtivas / empresasTotal) * 100) : 100;
+  if (isMaster) {
+    const [
+      perfisRes,
+      perfisAtivosRes,
+      conversasRes,
+      conversasSampleRes,
+      conversasRecentRes,
+      empresasRes,
+      byokRes,
+      recentLogs,
+    ] = await Promise.all([
+      supabase.from("perfis").select("id", { count: "exact", head: true }),
+      supabase
+        .from("perfis")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "ativo"),
+      supabase.from("conversas").select("id", { count: "exact", head: true }),
+      supabase
+        .from("conversas")
+        .select("mensagens")
+        .order("updated_at", { ascending: false })
+        .limit(SUCCESS_SAMPLE_LIMIT),
+      supabase
+        .from("conversas")
+        .select("id", { count: "exact", head: true })
+        .gte("updated_at", sinceIso),
+      supabase.from("empresas").select("id, status, is_active, chave_api_llm"),
+      supabase
+        .from("empresas")
+        .select("id", { count: "exact", head: true })
+        .not("chave_api_llm", "is", null),
+      fetchAuditLogs({ limit: RECENT_ACTIVITY_LIMIT }),
+    ]);
 
-        setStats({
-          scope: "platform",
-          scopeLabel: "Toda a plataforma",
-          totalUsuarios: perfisRes.count ?? 0,
-          usuariosAtivos: perfisAtivosRes.count ?? 0,
-          conversasIa: conversasRes.count ?? 0,
-          taxaSucesso: computeSuccessRate(conversasSampleRes.data ?? []),
-          uptimePercent,
-          uptimeLabel: `${empresasAtivas} de ${empresasTotal} empresas ativas`,
-          recentActivity: mapActivityRows((auditRes.data ?? []) as Record<string, unknown>[]),
-          systemStatus: buildPlatformSystemStatus({
-            empresasAtivas,
-            empresasTotal,
-            empresasSuspensas,
-            byokConfigured: byokRes.count ?? 0,
-            conversasRecentes: conversasRecentRes.count ?? 0,
-          }),
-        });
-        return;
-      }
+    const empresas = empresasRes.data ?? [];
+    const empresasTotal = empresas.length;
+    const empresasAtivas = empresas.filter((e) => e.is_active && e.status === "ativa").length;
+    const empresasSuspensas = empresas.filter((e) => e.status === "suspensa").length;
+    const uptimePercent =
+      empresasTotal > 0 ? Math.round((empresasAtivas / empresasTotal) * 100) : 100;
 
-      const [
-        perfisRes,
-        perfisAtivosRes,
-        conversasRes,
-        conversasSampleRes,
-        empresaRes,
-        agentesRes,
-        auditRes,
-      ] = await Promise.all([
-        supabase
-          .from("perfis")
-          .select("id", { count: "exact", head: true })
-          .eq("empresa_id", empresaId),
-        supabase
-          .from("perfis")
-          .select("id", { count: "exact", head: true })
-          .eq("empresa_id", empresaId)
-          .eq("status", "ativo"),
-        supabase
-          .from("conversas")
-          .select("id", { count: "exact", head: true })
-          .eq("empresa_id", empresaId),
-        supabase
-          .from("conversas")
-          .select("mensagens")
-          .eq("empresa_id", empresaId)
-          .order("updated_at", { ascending: false })
-          .limit(SUCCESS_SAMPLE_LIMIT),
-        supabase
-          .from("empresas_public")
-          .select(
-            "nome, status, is_active, chave_api_configurada, stripe_subscription_status",
-          )
-          .eq("id", empresaId)
-          .single(),
-        supabase
-          .from("agentes_ia")
-          .select("id", { count: "exact", head: true })
-          .eq("empresa_id", empresaId)
-          .eq("is_active", true),
-        supabase
-          .from("auditoria")
-          .select(
-            "id, acao, entidade_tipo, created_at, perfis(nome_completo), empresas(nome)",
-          )
-          .eq("empresa_id", empresaId)
-          .order("created_at", { ascending: false })
-          .limit(RECENT_ACTIVITY_LIMIT),
-      ]);
+    return {
+      scope: "platform",
+      scopeLabel: "Toda a plataforma",
+      totalUsuarios: perfisRes.count ?? 0,
+      usuariosAtivos: perfisAtivosRes.count ?? 0,
+      conversasIa: conversasRes.count ?? 0,
+      taxaSucesso: computeSuccessRate(conversasSampleRes.data ?? []),
+      uptimePercent,
+      uptimeLabel: `${empresasAtivas} de ${empresasTotal} empresas ativas`,
+      recentActivity: mapAuditToActivity(recentLogs),
+      systemStatus: buildPlatformSystemStatus({
+        empresasAtivas,
+        empresasTotal,
+        empresasSuspensas,
+        byokConfigured: byokRes.count ?? 0,
+        conversasRecentes: conversasRecentRes.count ?? 0,
+      }),
+    };
+  }
 
-      const empresa = empresaRes.data;
-      const tenantOperational = Boolean(empresa?.is_active && empresa?.status === "ativa");
+  const [
+    perfisRes,
+    perfisAtivosRes,
+    conversasRes,
+    conversasSampleRes,
+    empresaRes,
+    agentesRes,
+    recentLogs,
+  ] = await Promise.all([
+    supabase
+      .from("perfis")
+      .select("id", { count: "exact", head: true })
+      .eq("empresa_id", empresaId),
+    supabase
+      .from("perfis")
+      .select("id", { count: "exact", head: true })
+      .eq("empresa_id", empresaId)
+      .eq("status", "ativo"),
+    supabase
+      .from("conversas")
+      .select("id", { count: "exact", head: true })
+      .eq("empresa_id", empresaId),
+    supabase
+      .from("conversas")
+      .select("mensagens")
+      .eq("empresa_id", empresaId)
+      .order("updated_at", { ascending: false })
+      .limit(SUCCESS_SAMPLE_LIMIT),
+    supabase
+      .from("empresas_public")
+      .select("nome, status, is_active, chave_api_configurada, stripe_subscription_status")
+      .eq("id", empresaId)
+      .single(),
+    supabase
+      .from("agentes_ia")
+      .select("id", { count: "exact", head: true })
+      .eq("empresa_id", empresaId)
+      .eq("is_active", true),
+    fetchAuditLogs({ limit: RECENT_ACTIVITY_LIMIT }),
+  ]);
 
-      setStats({
-        scope: "tenant",
-        scopeLabel: user.empresaNome,
-        totalUsuarios: perfisRes.count ?? 0,
-        usuariosAtivos: perfisAtivosRes.count ?? 0,
-        conversasIa: conversasRes.count ?? 0,
-        taxaSucesso: computeSuccessRate(conversasSampleRes.data ?? []),
-        uptimePercent: tenantOperational ? 100 : 0,
-        uptimeLabel: tenantOperational ? "Serviço operacional" : "Conta com restrições",
-        recentActivity: mapActivityRows((auditRes.data ?? []) as Record<string, unknown>[]),
-        systemStatus: buildTenantSystemStatus({
-          empresaNome: (empresa?.nome as string) ?? user.empresaNome,
-          isActive: Boolean(empresa?.is_active),
-          status: (empresa?.status as string) ?? "ativa",
-          byokConfigured: Boolean(empresa?.chave_api_configurada),
-          stripeStatus: (empresa?.stripe_subscription_status as string) ?? null,
-          agentesAtivos: agentesRes.count ?? 0,
-        }),
-      });
-    } catch (err) {
-      console.error("[dashboard-stats]", err);
-      setStats(null);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [useSupabase, user.empresaId, user.empresaNome, isMaster]);
+  const empresa = empresaRes.data;
+  const tenantOperational = Boolean(empresa?.is_active && empresa?.status === "ativa");
 
-  useEffect(() => {
-    void fetchStats();
-  }, [fetchStats]);
-
-  return { stats, isLoading, refresh: fetchStats, useSupabase };
+  return {
+    scope: "tenant",
+    scopeLabel: user.empresaNome,
+    totalUsuarios: perfisRes.count ?? 0,
+    usuariosAtivos: perfisAtivosRes.count ?? 0,
+    conversasIa: conversasRes.count ?? 0,
+    taxaSucesso: computeSuccessRate(conversasSampleRes.data ?? []),
+    uptimePercent: tenantOperational ? 100 : 0,
+    uptimeLabel: tenantOperational ? "Serviço operacional" : "Conta com restrições",
+    recentActivity: mapAuditToActivity(recentLogs),
+    systemStatus: buildTenantSystemStatus({
+      empresaNome: (empresa?.nome as string) ?? user.empresaNome,
+      isActive: Boolean(empresa?.is_active),
+      status: (empresa?.status as string) ?? "ativa",
+      byokConfigured: Boolean(empresa?.chave_api_configurada),
+      stripeStatus: (empresa?.stripe_subscription_status as string) ?? null,
+      agentesAtivos: agentesRes.count ?? 0,
+    }),
+  };
 }

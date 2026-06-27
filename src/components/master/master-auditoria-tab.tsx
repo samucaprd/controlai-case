@@ -2,8 +2,8 @@ import { Search, Shield } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { AuditLogEntry } from "@/features/master/use-master-audit";
-import { formatActivityLabel, formatEntityTipo } from "@/features/dashboard/format";
+import type { AuditLogEntry } from "@/features/audit/types";
+import { formatActivityLabel, formatEntityTipo } from "@/features/audit/format";
 
 interface MasterAuditoriaTabProps {
   logs: AuditLogEntry[];
@@ -79,31 +79,40 @@ export function MasterAuditoriaTab({
                 </tr>
               </thead>
               <tbody>
-                {logs.map((log) => (
+                {logs.map((log) => {
+                  const entidadeId =
+                    typeof log.depois?.entidade_id === "number"
+                      ? log.depois.entidade_id
+                      : typeof log.depois?.id === "number"
+                        ? log.depois.id
+                        : null;
+
+                  return (
                   <tr key={log.id} className="border-b border-border/60 last:border-0">
                     <td className="p-3 pl-4 text-muted-foreground whitespace-nowrap">
-                      {formatDateTime(log.created_at)}
+                      {formatDateTime(log.createdAt)}
                     </td>
                     <td className="p-3">
                       <Badge variant="outline" className="font-normal">
-                        {formatActivityLabel(log.acao, log.entidade_tipo)}
+                        {formatActivityLabel(log.acao, log.tabela)}
                       </Badge>
                     </td>
                     <td className="p-3 text-muted-foreground">
-                      {formatEntityTipo(log.entidade_tipo)}
-                      {log.entidade_id != null && (
-                        <span className="text-foreground"> #{log.entidade_id}</span>
+                      {formatEntityTipo(log.tabela)}
+                      {entidadeId != null && (
+                        <span className="text-foreground"> #{entidadeId}</span>
                       )}
                     </td>
-                    <td className="p-3">{log.empresa_nome ?? "—"}</td>
+                    <td className="p-3">{log.empresaNome ?? "—"}</td>
                     <td className="p-3 pr-4">
-                      <span className="block">{log.user_nome ?? "—"}</span>
-                      {log.user_email && (
-                        <span className="text-xs text-muted-foreground">{log.user_email}</span>
+                      <span className="block">{log.userNome ?? "—"}</span>
+                      {log.userEmail && (
+                        <span className="text-xs text-muted-foreground">{log.userEmail}</span>
                       )}
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

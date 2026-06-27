@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import type { AppRole } from "@/features/auth/types";
-import { logAudit } from "@/lib/audit/log-audit";
 import { getSupabase } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/is-configured";
 
@@ -153,27 +152,6 @@ export function useMasterUsers() {
 
       const { error } = await supabase.from("perfis").update(dbPatch).eq("id", id);
       if (error) throw error;
-
-      await logAudit({
-        acao: "master_usuario_atualizado",
-        entidade_tipo: "perfil",
-        empresa_id: previous.empresaId,
-        detalhes: {
-          user_id: id,
-          email: previous.email,
-          empresa_nome: previous.empresaNome,
-          antes: {
-            nome: previous.nome,
-            role: previous.role,
-            status: previous.status,
-          },
-          depois: {
-            nome: patch.nome ?? previous.nome,
-            role: patch.role ?? previous.role,
-            status: patch.status ?? previous.status,
-          },
-        },
-      });
 
       await fetchUsers();
     },
