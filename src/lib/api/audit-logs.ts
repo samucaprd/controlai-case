@@ -1,4 +1,5 @@
 import { getSupabase } from "@/lib/supabase/client";
+import { expandAuditSearchTerms } from "@/features/audit/expand-search";
 import type { AuditLogEntry, AuditLogsFilters } from "@/features/audit/types";
 
 interface AuditLogRow {
@@ -33,14 +34,40 @@ function mapRow(row: AuditLogRow): AuditLogEntry {
 
 export async function fetchAuditLogs(filters: AuditLogsFilters): Promise<AuditLogEntry[]> {
   const supabase = getSupabase();
+  const searchRaw = filters.search?.trim() ?? "";
+
+  // Primeira tentativa: busca completa (rótulos PT-BR via RPC)
   const { data, error } = await supabase.rpc("list_audit_logs", {
     p_empresa_id: filters.empresaId ?? null,
     p_tabela: filters.tabela ?? null,
     p_limit: filters.limit ?? 50,
     p_offset: filters.offset ?? 0,
-    p_search: filters.search?.trim() || null,
+    p_search: searchRaw || null,
   });
 
   if (error) throw new Error(error.message);
-  return ((data ?? []) as AuditLogRow[]).map(mapRow);
+
+  const rows = (data ?? []) as AuditLogRow[];
+  if (rows.length > 0 || !searchRaw) {
+    return rows.map(mapRow);
+  }
+
+  // Fallback: termos expandidos (CREATE → INSERT, etc.)
+  const expanded = expandAuditSearchTerms(searchRaw);
+  for (const term of expanded) {
+    if (term === searchRaw) continue;
+    const { data: retry, error: retryError } = await supabase.rpc("list_audit_logs", {
+      p_empresa_id: filters.empresaId ?? null,
+      p_tabela: filters.tabela ?? null,
+      p_limit: filters.limit ?? 50,
+      p_offset: filters.offset ?? 0,
+      p_search: term,
+    });
+    if (retryError) throw new Error(retryError.message);
+    if ((retry ?? []).length > 0) {
+      return (retry as AuditLogRow[]).map(mapRow);
+    }
+  }
+
+  return [];
 }
