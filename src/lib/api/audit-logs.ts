@@ -1,6 +1,10 @@
 import { getSupabase } from "@/lib/supabase/client";
 import { expandAuditSearchTerms } from "@/features/audit/expand-search";
-import type { AuditLogEntry, AuditLogsFilters } from "@/features/audit/types";
+import type {
+  AuditLogEntry,
+  AuditLogsFilters,
+  AuditLogUserOption,
+} from "@/features/audit/types";
 
 interface AuditLogRow {
   id: string;
@@ -43,6 +47,8 @@ export async function fetchAuditLogs(filters: AuditLogsFilters): Promise<AuditLo
     p_limit: filters.limit ?? 50,
     p_offset: filters.offset ?? 0,
     p_search: searchRaw || null,
+    p_user_id: filters.userId ?? null,
+    p_acao: filters.acao ?? null,
   });
 
   if (error) throw new Error(error.message);
@@ -62,6 +68,8 @@ export async function fetchAuditLogs(filters: AuditLogsFilters): Promise<AuditLo
       p_limit: filters.limit ?? 50,
       p_offset: filters.offset ?? 0,
       p_search: term,
+      p_user_id: filters.userId ?? null,
+      p_acao: filters.acao ?? null,
     });
     if (retryError) throw new Error(retryError.message);
     if ((retry ?? []).length > 0) {
@@ -70,4 +78,33 @@ export async function fetchAuditLogs(filters: AuditLogsFilters): Promise<AuditLo
   }
 
   return [];
+}
+
+interface AuditLogUserRow {
+  user_id: string;
+  user_nome: string | null;
+  user_email: string | null;
+}
+
+export async function fetchAuditLogUsers(
+  empresaId?: number | null,
+): Promise<AuditLogUserOption[]> {
+  const supabase = getSupabase();
+  const { data, error } = await supabase.rpc("list_audit_log_users", {
+    p_empresa_id: empresaId ?? null,
+  });
+
+  if (error) throw new Error(error.message);
+
+  return ((data ?? []) as AuditLogUserRow[]).map((row) => ({
+    userId: row.user_id,
+    userNome: row.user_nome,
+    userEmail: row.user_email,
+  }));
+}
+
+export async function deleteAuditLog(id: string): Promise<void> {
+  const supabase = getSupabase();
+  const { error } = await supabase.rpc("delete_audit_log", { p_id: id });
+  if (error) throw new Error(error.message);
 }

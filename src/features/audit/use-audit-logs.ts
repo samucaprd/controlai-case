@@ -10,6 +10,8 @@ export function useAuditLogs(isMaster: boolean) {
   const useSupabase = isSupabaseConfigured();
   const [empresaId, setEmpresaId] = useState<number | null>(null);
   const [tabela, setTabela] = useState<string>("all");
+  const [userId, setUserId] = useState<string>("all");
+  const [acao, setAcao] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
@@ -22,11 +24,13 @@ export function useAuditLogs(isMaster: boolean) {
     () => ({
       empresaId: isMaster ? empresaId : undefined,
       tabela: tabela === "all" ? null : tabela,
+      userId: userId === "all" ? null : userId,
+      acao: acao === "all" ? null : acao,
       search: debouncedSearch,
       limit: 100,
       offset: 0,
     }),
-    [isMaster, empresaId, tabela, debouncedSearch],
+    [isMaster, empresaId, tabela, userId, acao, debouncedSearch],
   );
 
   const query = useQuery({
@@ -48,7 +52,12 @@ export function useAuditLogs(isMaster: boolean) {
     setEmpresaId,
     tabela,
     setTabela,
+    userId,
+    setUserId,
+    acao,
+    setAcao,
     search,
     setSearch,
+    filters,
   };
 }

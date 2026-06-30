@@ -43,14 +43,26 @@ const ENTITY_TYPE_LABELS: Record<string, string> = {
   empresas: "Empresa",
   agentes_ia: "Agente IA",
   planos: "Plano",
-  plano: "Plano",
-  empresa: "Empresa",
-  perfil: "Usuário",
+  conversas: "Conversa",
 };
+
+/** Aliases semânticos (log_auditoria) → nome real da tabela no banco */
+const AUDIT_TABLE_ALIASES: Record<string, string> = {
+  empresa: "empresas",
+  perfil: "perfis",
+  plano: "planos",
+  conversa: "conversas",
+};
+
+export function normalizeAuditTable(tabela: string): string {
+  const key = tabela.trim().toLowerCase();
+  return AUDIT_TABLE_ALIASES[key] ?? key;
+}
 
 function dbOpLabel(acao: string, entidadeTipo?: string | null): string | null {
   if (!entidadeTipo) return null;
-  const labels = DB_OP_LABELS[entidadeTipo];
+  const canonical = normalizeAuditTable(entidadeTipo);
+  const labels = DB_OP_LABELS[canonical];
   if (!labels) return null;
   if (acao === "INSERT") return labels.insert;
   if (acao === "UPDATE") return labels.update;
@@ -70,7 +82,20 @@ export function formatActivityLabel(acao: string, entidadeTipo?: string | null):
 }
 
 export function formatEntityTipo(entidadeTipo: string): string {
-  return ENTITY_TYPE_LABELS[entidadeTipo] ?? entidadeTipo.replaceAll("_", " ");
+  const canonical = normalizeAuditTable(entidadeTipo);
+  return (
+    ENTITY_TYPE_LABELS[canonical] ??
+    canonical.replaceAll("_", " ").replace(/\b\w/g, (c) => c.toUpperCase())
+  );
+}
+
+/** Rótulo amigável + nome técnico canônico da tabela */
+export function formatAuditTableDisplay(tabela: string): { label: string; technical: string } {
+  const canonical = normalizeAuditTable(tabela);
+  return {
+    label: formatEntityTipo(canonical),
+    technical: canonical,
+  };
 }
 
 export function formatDashboardPercent(value: number): string {

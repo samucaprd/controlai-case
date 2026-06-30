@@ -15,7 +15,15 @@ export interface AuditLogEntry {
 export interface AuditLogsFilters {
   empresaId?: number | null;
   tabela?: string | null;
+  userId?: string | null;
+  acao?: string | null;
   search?: string;
   limit?: number;
   offset?: number;
+}
+
+export interface AuditLogUserOption {
+  userId: string;
+  userNome: string | null;
+  userEmail: string | null;
 }
