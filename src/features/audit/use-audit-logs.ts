@@ -45,6 +45,8 @@ export function useAuditLogs(isMaster: boolean) {
     logs: query.data ?? [],
     isLoading: query.isLoading,
     isFetching: query.isFetching,
+    isStale: query.isStale,
+    dataUpdatedAt: query.dataUpdatedAt,
     error: query.error,
     refresh: query.refetch,
     useSupabase,

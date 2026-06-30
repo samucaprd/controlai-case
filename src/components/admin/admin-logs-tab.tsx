@@ -39,6 +39,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
+import { AdminLogsPerformancePanel } from "@/components/admin/admin-logs-performance-panel";
 import { AuditLogDiffTable } from "@/features/audit/audit-log-diff-table";
 import { auditActionBadgeVariant } from "@/features/audit/audit-field-labels";
 import { formatActivityLabel, formatAuditTableDisplay } from "@/features/audit/format";
@@ -202,6 +203,8 @@ export function AdminLogsTab() {
     logs,
     isLoading,
     isFetching,
+    isStale,
+    dataUpdatedAt,
     refresh,
     useSupabase,
     empresaId,
@@ -350,6 +353,14 @@ export function AdminLogsTab() {
               </div>
             )}
           </div>
+
+          <AdminLogsPerformancePanel
+            filters={filters}
+            dataUpdatedAt={dataUpdatedAt}
+            isFetching={isFetching}
+            isStale={isStale}
+            recordCount={logs.length}
+          />
 
           <p className="text-sm text-muted-foreground">
             Exibindo <strong>{logs.length}</strong> registro(s)

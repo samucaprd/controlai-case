@@ -13,7 +13,7 @@ Use este checklist antes de colocar a plataforma em produção.
 
 ## 2. Supabase
 
-- [ ] Aplicar todas as migrations (`022_epic7_audit_logs_rls_performance` incluída)
+- [ ] Aplicar todas as migrations (`022` a `027` — auditoria, busca, filtros, aliases)
 - [ ] Deploy das Edge Functions críticas:
   - `invite-tenant-user`, `delete-tenant-user`
   - `chat-completion`, `manage-byok-key`
